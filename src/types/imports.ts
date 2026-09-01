@@ -49,6 +49,7 @@ export interface ImportConfirmationSummary {
 
 /** Payload aceito ao importar uma base JSON exportada (legado ou desta aplicação). */
 export interface LegacyJsonCollaborator {
+  id?: string;
   nome?: string;
   name?: string;
   colaborador?: string;
@@ -80,6 +81,16 @@ export interface LegacyJsonCollaborator {
   perfilFacilitador?: boolean;
   cargo?: string;
   status?: string;
+  saldoMesAnterior?: string;
+  saldoBancoHoras?: string;
+  creditoMes?: string;
+  debitoMes?: string;
+  saldoMes?: string;
+  saldoCiclo?: string;
+  horasExtras50?: string;
+  horasExtras100?: string;
+  faltasAtrasos?: string;
+  folgasProgramadas?: Array<{ data?: string; motivo?: string }>;
   [key: string]: unknown;
 }
 
@@ -126,6 +137,44 @@ export interface LegacyJsonAccessProfile {
   [key: string]: unknown;
 }
 
+export interface LegacyJsonLeave {
+  colaboradorId?: string;
+  empresa?: string;
+  data?: string;
+  motivo?: string;
+  observacao?: string;
+  [key: string]: unknown;
+}
+
+export interface LegacyJsonRecord {
+  colaboradorId?: string;
+  periodo?: string;
+  data?: string;
+  diaSemana?: string;
+  codigoHorario?: string;
+  marcacoes?: string[];
+  ocorrencia?: string;
+  horasTrabalhadas?: string;
+  creditoBH?: string;
+  debitoBH?: string;
+  saldoBH?: string;
+  adicionalNoturno?: string;
+  extra50?: string;
+  extra100?: string;
+  tipoDia?: string;
+  [key: string]: unknown;
+}
+
+export interface LegacyJsonCycle {
+  empresa?: string;
+  inicioCiclo?: string;
+  periodicidadeMeses?: number;
+  limiteAlertaPositivo?: string;
+  limiteAlertaNegativo?: string;
+  responsavel?: string;
+  [key: string]: unknown;
+}
+
 export interface LegacyJsonExport {
   collaborators?: LegacyJsonCollaborator[];
   managers?: LegacyJsonManager[];
@@ -133,8 +182,9 @@ export interface LegacyJsonExport {
   perfisAcesso?: LegacyJsonAccessProfile[];
   accessProfiles?: LegacyJsonAccessProfile[];
   profiles?: LegacyJsonAccessProfile[];
-  leaves?: Array<{ colaboradorId?: string; data?: string; motivo?: string; observacao?: string; [key: string]: unknown }>;
-  records?: Array<Record<string, unknown>>;
-  cycles?: Array<Record<string, unknown>>;
+  leaves?: LegacyJsonLeave[];
+  records?: LegacyJsonRecord[];
+  cycles?: LegacyJsonCycle[];
+  gestaoConfig?: { custoHora?: number; adicionalPct?: number };
   [key: string]: unknown;
 }

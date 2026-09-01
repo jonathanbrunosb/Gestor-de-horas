@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../hooks/AppDataContext';
 import { PageContent } from '../components/layout/PageContent';
 import { Button } from '../components/ui/Button';
@@ -11,6 +11,7 @@ import { CycleForm } from '../components/forms/CycleForm';
 import { usePersistedFilter } from '../hooks/useFilters';
 import { createAccessProfile, deleteAccessProfile, updateAccessProfile, type AccessProfileInput } from '../services/accessProfilesService';
 import { createCycle, deleteCycle, restoreDefaultCycles, type CycleInput } from '../services/cyclesService';
+import { importLegacyJson } from '../services/jsonImportService';
 import { canManageAccessProfiles, canManageMasterData, accessTypeBadgeTone, isDeveloperMatricula } from '../lib/permissions';
 import { ACCESS_PROFILE_TYPES } from '../lib/constants';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
@@ -18,6 +19,7 @@ import { getCycleSequence } from '../utils/cycles';
 import { minutesToTime } from '../utils/time';
 import { downloadFile } from '../utils/formatters';
 import type { AccessProfileRow, CompanyCycleRow } from '../types/database';
+import type { LegacyJsonExport } from '../types/imports';
 
 export function SettingsPage() {
   const { data, access, toast } = useAppContext();
@@ -29,6 +31,9 @@ export function SettingsPage() {
   const [cycleModalOpen, setCycleModalOpen] = useState(false);
   const [deletingCycle, setDeletingCycle] = useState<CompanyCycleRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingBackup, setPendingBackup] = useState<{ fileName: string; payload: LegacyJsonExport } | null>(null);
+  const [importingBackup, setImportingBackup] = useState(false);
+  const backupInputRef = useRef<HTMLInputElement>(null);
 
   const canManageProfiles = canManageAccessProfiles(access.context.profile?.access_type);
   const canManageCycles = canManageMasterData(access.context.profile?.access_type);
@@ -116,6 +121,43 @@ export function SettingsPage() {
     const payload = { companies: data.companies, collaborators: data.collaborators, managers: data.managers, cycles: data.cycles, leaves: data.leaves, records: data.records, accessProfiles: data.accessProfiles };
     downloadFile(`backup-monitor-horas-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), 'application/json');
     toast.notify('Backup JSON exportado.', 'success');
+  }
+
+  async function handleBackupFileSelected(file: File) {
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as LegacyJsonExport;
+      const hasRecognizableData = ['collaborators', 'managers', 'records', 'leaves', 'cycles', 'userProfiles', 'perfisAcesso', 'accessProfiles', 'profiles'].some(
+        (key) => Array.isArray((payload as Record<string, unknown>)[key]) && ((payload as Record<string, unknown>)[key] as unknown[]).length > 0
+      );
+      if (!hasRecognizableData) {
+        toast.notify('Arquivo JSON não reconhecido — verifique se é um backup exportado pelo sistema.', 'danger');
+        return;
+      }
+      setPendingBackup({ fileName: file.name, payload });
+    } catch {
+      toast.notify('Falha ao ler o arquivo — verifique se é um JSON válido.', 'danger');
+    }
+  }
+
+  async function handleConfirmBackupImport() {
+    if (!pendingBackup) return;
+    setImportingBackup(true);
+    try {
+      const summary = await importLegacyJson(pendingBackup.payload, data.companies, access.context.matricula);
+      toast.notify(
+        `Backup importado: ${summary.collaboratorsCreated} colaborador(es) criado(s), ${summary.collaboratorsUpdated} atualizado(s), ` +
+          `${summary.recordsInserted} registro(s) de ponto, ${summary.leavesInserted} folga(s), ${summary.managersCreated + summary.managersUpdated} gestor(es), ` +
+          `${summary.cyclesProcessed} ciclo(s), ${summary.profilesCreated} perfil(is) novo(s).`,
+        'success'
+      );
+      setPendingBackup(null);
+      data.reload();
+    } catch (error) {
+      toast.notify(error instanceof Error ? error.message : 'Falha ao importar o backup.', 'danger');
+    } finally {
+      setImportingBackup(false);
+    }
   }
 
   return (
@@ -254,14 +296,39 @@ export function SettingsPage() {
             <div className="mini-value">{data.leaves.length}</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
           <Button variant="secondary" onClick={() => data.reload()}>
             Recarregar dados
           </Button>
           <Button variant="secondary" onClick={handleExportBackup}>
             Exportar backup JSON
           </Button>
+          {canManageCycles && (
+            <>
+              <Button variant="secondary" onClick={() => backupInputRef.current?.click()}>
+                Importar backup JSON
+              </Button>
+              <input
+                ref={backupInputRef}
+                type="file"
+                accept=".json,application/json"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleBackupFileSelected(file);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )}
         </div>
+        {canManageCycles && (
+          <p className="small-text" style={{ marginTop: 8 }}>
+            Aceita um backup completo (empresas, gestores, colaboradores com saldos, registros de ponto, folgas, ciclos e
+            perfis de acesso) exportado por esta aplicação ou pelo sistema legado. Nunca duplica dados, nunca cria
+            gestores automaticamente e nunca altera o perfil protegido do Desenvolvedor.
+          </p>
+        )}
       </div>
 
       <div className="card">
@@ -329,6 +396,57 @@ export function SettingsPage() {
 
       <Modal open={cycleModalOpen} title="Cadastrar ciclo" onClose={() => setCycleModalOpen(false)}>
         <CycleForm companies={data.companies} onSubmit={handleCycleSubmit} onCancel={() => setCycleModalOpen(false)} submitting={submitting} />
+      </Modal>
+
+      <Modal
+        open={Boolean(pendingBackup)}
+        title="Confirmar importação de backup"
+        description={pendingBackup ? `Arquivo: ${pendingBackup.fileName}` : undefined}
+        onClose={() => setPendingBackup(null)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPendingBackup(null)} disabled={importingBackup}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmBackupImport} disabled={importingBackup}>
+              {importingBackup ? 'Importando…' : 'Confirmar importação'}
+            </Button>
+          </>
+        }
+      >
+        {pendingBackup && (
+          <div className="grid cards-4">
+            <div className="mini-stat">
+              <div className="mini-label">Colaboradores</div>
+              <div className="mini-value">{pendingBackup.payload.collaborators?.length ?? 0}</div>
+            </div>
+            <div className="mini-stat">
+              <div className="mini-label">Gestores</div>
+              <div className="mini-value">{pendingBackup.payload.managers?.length ?? 0}</div>
+            </div>
+            <div className="mini-stat">
+              <div className="mini-label">Registros de ponto</div>
+              <div className="mini-value">{pendingBackup.payload.records?.length ?? 0}</div>
+            </div>
+            <div className="mini-stat">
+              <div className="mini-label">Folgas</div>
+              <div className="mini-value">{pendingBackup.payload.leaves?.length ?? 0}</div>
+            </div>
+            <div className="mini-stat">
+              <div className="mini-label">Ciclos</div>
+              <div className="mini-value">{pendingBackup.payload.cycles?.length ?? 0}</div>
+            </div>
+            <div className="mini-stat">
+              <div className="mini-label">Perfis de acesso</div>
+              <div className="mini-value">{pendingBackup.payload.userProfiles?.length ?? pendingBackup.payload.accessProfiles?.length ?? 0}</div>
+            </div>
+          </div>
+        )}
+        <p className="small-text" style={{ marginTop: 12 }}>
+          Colaboradores/gestores/perfis existentes serão atualizados (nunca duplicados); registros e folgas já
+          importados anteriormente são ignorados automaticamente. O perfil do Desenvolvedor (u1205385) nunca é alterado
+          por esta importação.
+        </p>
       </Modal>
 
       <ConfirmDialog

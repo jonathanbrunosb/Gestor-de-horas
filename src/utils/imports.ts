@@ -1,5 +1,11 @@
 import type { DayType } from '../types/database';
-import type { LegacyJsonAccessProfile, LegacyJsonCollaborator, LegacyJsonManager, LegacyJsonExport } from '../types/imports';
+import type {
+  LegacyJsonAccessProfile,
+  LegacyJsonCollaborator,
+  LegacyJsonCycle,
+  LegacyJsonManager,
+  LegacyJsonExport
+} from '../types/imports';
 import { resolveCompany, extractCompanyCode } from './companies';
 import { normalizeMatricula } from '../lib/permissions';
 import { timeToMinutes } from './time';
@@ -103,6 +109,17 @@ export interface NormalizedLegacyCollaborator {
   isFacilitator: boolean;
   title?: string;
   status: 'Ativo' | 'Inativo';
+  previousMonthBalanceMinutes: number;
+  monthCreditMinutes: number;
+  monthDebitMinutes: number;
+  monthBalanceMinutes: number;
+  cycleBalanceMinutes: number;
+  bankHoursBalanceMinutes: number;
+  extra50Minutes: number;
+  extra100Minutes: number;
+  absenceDelayMinutes: number;
+  /** Folgas embutidas no próprio colaborador (fallback quando não há `leaves` no topo do export). */
+  embeddedLeaves: Array<{ date: string; reason: string }>;
 }
 
 export function normalizeLegacyCollaborator(raw: LegacyJsonCollaborator): NormalizedLegacyCollaborator {
@@ -120,7 +137,19 @@ export function normalizeLegacyCollaborator(raw: LegacyJsonCollaborator): Normal
     managerRegistration: raw.gestorMatricula ? normalizeMatricula(String(raw.gestorMatricula)) : raw.managerRegistration ? normalizeMatricula(String(raw.managerRegistration)) : undefined,
     isFacilitator: Boolean(raw.facilitador ?? raw.isFacilitador ?? raw.perfilFacilitador ?? false),
     title: raw.cargo ? String(raw.cargo) : undefined,
-    status: raw.status === 'Inativo' ? 'Inativo' : 'Ativo'
+    status: raw.status === 'Inativo' ? 'Inativo' : 'Ativo',
+    previousMonthBalanceMinutes: timeToMinutes(raw.saldoMesAnterior),
+    monthCreditMinutes: timeToMinutes(raw.creditoMes),
+    monthDebitMinutes: timeToMinutes(raw.debitoMes),
+    monthBalanceMinutes: timeToMinutes(raw.saldoMes),
+    cycleBalanceMinutes: timeToMinutes(raw.saldoCiclo),
+    bankHoursBalanceMinutes: timeToMinutes(raw.saldoBancoHoras),
+    extra50Minutes: timeToMinutes(raw.horasExtras50),
+    extra100Minutes: timeToMinutes(raw.horasExtras100),
+    absenceDelayMinutes: timeToMinutes(raw.faltasAtrasos),
+    embeddedLeaves: (raw.folgasProgramadas ?? [])
+      .filter((leave): leave is { data: string; motivo?: string } => Boolean(leave?.data))
+      .map((leave) => ({ date: leave.data, reason: leave.motivo || 'Compensação de banco de horas' }))
   };
 }
 
@@ -177,6 +206,26 @@ export function normalizeLegacyAccessProfile(raw: LegacyJsonAccessProfile): Norm
     area: raw.area ? String(raw.area) : undefined,
     notes: raw.observacao ? String(raw.observacao) : raw.obs,
     status: raw.status === 'Inativo' ? 'Inativo' : 'Ativo'
+  };
+}
+
+export interface NormalizedLegacyCycle {
+  company: string;
+  startMonth: string;
+  periodicityMonths: number;
+  positiveAlertMinutes: number;
+  negativeAlertMinutes: number;
+  responsible: string;
+}
+
+export function normalizeLegacyCycle(raw: LegacyJsonCycle): NormalizedLegacyCycle {
+  return {
+    company: resolveCompany(raw.empresa),
+    startMonth: String(raw.inicioCiclo ?? ''),
+    periodicityMonths: raw.periodicidadeMeses === 3 ? 3 : 4,
+    positiveAlertMinutes: raw.limiteAlertaPositivo ? timeToMinutes(raw.limiteAlertaPositivo) : 600,
+    negativeAlertMinutes: raw.limiteAlertaNegativo ? timeToMinutes(raw.limiteAlertaNegativo) : -300,
+    responsible: String(raw.responsavel ?? 'Contabilidade Corporativa')
   };
 }
 
