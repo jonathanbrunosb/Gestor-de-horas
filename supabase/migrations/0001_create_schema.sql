@@ -1,5 +1,9 @@
 -- Monitor de Controles de Horas — schema inicial
 -- Todas as durações/saldos são armazenados em MINUTOS inteiros (nunca strings "HH:MM").
+--
+-- Esta migration é IDEMPOTENTE (usa "if not exists" e recria triggers) para
+-- que possa ser colada mais de uma vez no SQL Editor do Supabase sem erro,
+-- caso a execução seja repetida por engano.
 
 create extension if not exists "pgcrypto";
 
@@ -15,7 +19,7 @@ $$ language plpgsql;
 -- ══════════════════════════════════════════════════════════════
 -- companies
 -- ══════════════════════════════════════════════════════════════
-create table companies (
+create table if not exists companies (
   id uuid primary key default gen_random_uuid(),
   code text unique,
   name text not null,
@@ -25,13 +29,14 @@ create table companies (
   updated_at timestamptz not null default now()
 );
 
+drop trigger if exists trg_companies_updated_at on companies;
 create trigger trg_companies_updated_at before update on companies
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- company_cycles
 -- ══════════════════════════════════════════════════════════════
-create table company_cycles (
+create table if not exists company_cycles (
   id uuid primary key default gen_random_uuid(),
   company_id uuid references companies(id) on delete cascade,
   start_month text not null,
@@ -45,15 +50,16 @@ create table company_cycles (
   constraint chk_start_month_format check (start_month ~ '^\d{4}-\d{2}$')
 );
 
-create index idx_company_cycles_company_id on company_cycles(company_id);
+create index if not exists idx_company_cycles_company_id on company_cycles(company_id);
 
+drop trigger if exists trg_company_cycles_updated_at on company_cycles;
 create trigger trg_company_cycles_updated_at before update on company_cycles
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- managers
 -- ══════════════════════════════════════════════════════════════
-create table managers (
+create table if not exists managers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   registration text not null unique,
@@ -65,15 +71,16 @@ create table managers (
   updated_at timestamptz not null default now()
 );
 
-create index idx_managers_company_id on managers(company_id);
+create index if not exists idx_managers_company_id on managers(company_id);
 
+drop trigger if exists trg_managers_updated_at on managers;
 create trigger trg_managers_updated_at before update on managers
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- access_profiles
 -- ══════════════════════════════════════════════════════════════
-create table access_profiles (
+create table if not exists access_profiles (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   registration text not null unique,
@@ -87,13 +94,14 @@ create table access_profiles (
   updated_at timestamptz not null default now()
 );
 
+drop trigger if exists trg_access_profiles_updated_at on access_profiles;
 create trigger trg_access_profiles_updated_at before update on access_profiles
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- collaborators
 -- ══════════════════════════════════════════════════════════════
-create table collaborators (
+create table if not exists collaborators (
   id uuid primary key default gen_random_uuid(),
   company_id uuid not null references companies(id),
   manager_id uuid references managers(id),
@@ -127,17 +135,18 @@ create table collaborators (
   unique (company_id, registration)
 );
 
-create index idx_collaborators_company_id on collaborators(company_id);
-create index idx_collaborators_manager_id on collaborators(manager_id);
-create index idx_collaborators_status on collaborators(status);
+create index if not exists idx_collaborators_company_id on collaborators(company_id);
+create index if not exists idx_collaborators_manager_id on collaborators(manager_id);
+create index if not exists idx_collaborators_status on collaborators(status);
 
+drop trigger if exists trg_collaborators_updated_at on collaborators;
 create trigger trg_collaborators_updated_at before update on collaborators
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- time_records
 -- ══════════════════════════════════════════════════════════════
-create table time_records (
+create table if not exists time_records (
   id uuid primary key default gen_random_uuid(),
   collaborator_id uuid not null references collaborators(id) on delete cascade,
   period text,
@@ -160,17 +169,18 @@ create table time_records (
   unique (collaborator_id, record_date, period)
 );
 
-create index idx_time_records_collaborator_id on time_records(collaborator_id);
-create index idx_time_records_period on time_records(period);
-create index idx_time_records_record_date on time_records(record_date);
+create index if not exists idx_time_records_collaborator_id on time_records(collaborator_id);
+create index if not exists idx_time_records_period on time_records(period);
+create index if not exists idx_time_records_record_date on time_records(record_date);
 
+drop trigger if exists trg_time_records_updated_at on time_records;
 create trigger trg_time_records_updated_at before update on time_records
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- leaves
 -- ══════════════════════════════════════════════════════════════
-create table leaves (
+create table if not exists leaves (
   id uuid primary key default gen_random_uuid(),
   collaborator_id uuid not null references collaborators(id) on delete cascade,
   company_id uuid references companies(id),
@@ -184,16 +194,17 @@ create table leaves (
   unique (collaborator_id, leave_date)
 );
 
-create index idx_leaves_collaborator_id on leaves(collaborator_id);
-create index idx_leaves_leave_date on leaves(leave_date);
+create index if not exists idx_leaves_collaborator_id on leaves(collaborator_id);
+create index if not exists idx_leaves_leave_date on leaves(leave_date);
 
+drop trigger if exists trg_leaves_updated_at on leaves;
 create trigger trg_leaves_updated_at before update on leaves
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- imports
 -- ══════════════════════════════════════════════════════════════
-create table imports (
+create table if not exists imports (
   id uuid primary key default gen_random_uuid(),
   filename text,
   file_type text check (file_type in ('csv', 'txt', 'pdf', 'json')),
@@ -210,12 +221,12 @@ create table imports (
   created_at timestamptz not null default now()
 );
 
-create index idx_imports_created_at on imports(created_at desc);
+create index if not exists idx_imports_created_at on imports(created_at desc);
 
 -- ══════════════════════════════════════════════════════════════
 -- app_settings
 -- ══════════════════════════════════════════════════════════════
-create table app_settings (
+create table if not exists app_settings (
   id uuid primary key default gen_random_uuid(),
   setting_key text unique not null,
   setting_value jsonb not null,
@@ -223,13 +234,14 @@ create table app_settings (
   updated_at timestamptz not null default now()
 );
 
+drop trigger if exists trg_app_settings_updated_at on app_settings;
 create trigger trg_app_settings_updated_at before update on app_settings
   for each row execute function set_updated_at();
 
 -- ══════════════════════════════════════════════════════════════
 -- notification_logs
 -- ══════════════════════════════════════════════════════════════
-create table notification_logs (
+create table if not exists notification_logs (
   id uuid primary key default gen_random_uuid(),
   collaborator_id uuid references collaborators(id),
   manager_id uuid references managers(id),
@@ -244,12 +256,12 @@ create table notification_logs (
   created_at timestamptz not null default now()
 );
 
-create index idx_notification_logs_collaborator_id on notification_logs(collaborator_id);
+create index if not exists idx_notification_logs_collaborator_id on notification_logs(collaborator_id);
 
 -- ══════════════════════════════════════════════════════════════
 -- audit_logs
 -- ══════════════════════════════════════════════════════════════
-create table audit_logs (
+create table if not exists audit_logs (
   id uuid primary key default gen_random_uuid(),
   actor_registration text,
   action text not null,
@@ -260,5 +272,5 @@ create table audit_logs (
   created_at timestamptz not null default now()
 );
 
-create index idx_audit_logs_created_at on audit_logs(created_at desc);
-create index idx_audit_logs_entity on audit_logs(entity_type, entity_id);
+create index if not exists idx_audit_logs_created_at on audit_logs(created_at desc);
+create index if not exists idx_audit_logs_entity on audit_logs(entity_type, entity_id);
