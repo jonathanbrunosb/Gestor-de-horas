@@ -1,0 +1,32 @@
+{
+  "name": "monitor-controles-horas",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Monitor de Controles de Horas — Equatorial. Monitoramento de banco de horas, ciclos de compensação, folgas e alertas trabalhistas.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.446.0",
+    "papaparse": "^5.4.1",
+    "pdfjs-dist": "^4.6.82",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.6"
+  }
+}

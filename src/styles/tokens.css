@@ -1,0 +1,80 @@
+:root {
+  /* Deep-navy palette */
+  --navy-950: #060F1A;
+  --navy-900: #0C1E2D;
+  --navy-800: #112840;
+  --navy-700: #163652;
+  --navy-600: #1C4568;
+  --navy-500: #255680;
+  --navy-400: #3A6882;
+  --navy-300: #6699B4;
+  --navy-200: #A8C8DC;
+  --navy-100: #D4E8F4;
+  --navy-50: #EAF3FA;
+
+  /* Semantic */
+  --primary: var(--navy-700);
+  --primary-dark: var(--navy-900);
+  --primary-soft: var(--navy-400);
+
+  /* Status — success */
+  --success: #155E3D;
+  --success-mid: #1A7248;
+  --success-bg: #E9F5EE;
+  --success-border: #A7D9BE;
+
+  /* Status — warning */
+  --warning: #92600A;
+  --warning-bg: #FEF6E4;
+  --warning-border: #EECF80;
+
+  /* Status — danger */
+  --danger: #8A1C1C;
+  --danger-mid: #B02222;
+  --danger-bg: #FDEDED;
+  --danger-border: #EFA8A8;
+
+  /* Status — info */
+  --info: #1A4FA8;
+  --info-bg: #EBF0FD;
+  --info-border: #A6BEF0;
+
+  /* Neutral */
+  --neutral: #64748B;
+  --neutral-bg: #F1F5F8;
+  --neutral-border: #D2DAE3;
+
+  /* Surface */
+  --background: #F4F3F0;
+  --surface: #FFFFFF;
+  --surface-alt: #F9F8F6;
+  --border: #DDD9D4;
+  --border-light: #EAE6E1;
+
+  /* Text */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.09), 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.11), 0 4px 8px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 24px 56px rgba(6, 15, 26, 0.18), 0 8px 16px rgba(6, 15, 26, 0.08);
+
+  /* Geometry */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-2xl: 22px;
+
+  /* Layout */
+  --sidebar-width: 240px;
+
+  /* Typography */
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+}
