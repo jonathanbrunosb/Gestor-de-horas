@@ -139,7 +139,8 @@ export function getComplianceAlerts(
         collaborator,
         count: incompleteDays.length,
         period,
-        details: `${incompleteDays.length} dia(s) com batida incompleta: ${label}${incompleteDays.length > 3 ? '…' : ''}`
+        details: `${incompleteDays.length} dia(s) com batida incompleta: ${label}${incompleteDays.length > 3 ? '…' : ''}`,
+        incompleteDays: incompleteDays.map((d) => d.iso)
       });
     }
   }

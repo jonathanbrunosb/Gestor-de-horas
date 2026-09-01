@@ -5,28 +5,45 @@ import { MetricCard } from '../components/ui/MetricCard';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { CalendarGrid } from '../components/calendar/CalendarGrid';
+import { Modal } from '../components/ui/Modal';
+import { LeaveForm } from '../components/forms/LeaveForm';
 import { computeDashboardStats } from '../services/dashboardService';
 import { minutesToTime } from '../utils/time';
 import { getCycleSequence } from '../utils/cycles';
-import { formatDate } from '../utils/dates';
-import type { LeaveWithRelations } from '../types/domain';
-import { canResetDatabase } from '../lib/permissions';
+import { formatDate, toISODate } from '../utils/dates';
+import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
+import { generateAndLogNotification } from '../services/notificationsService';
+import { createLeave, type LeaveInput } from '../services/leavesService';
+import type { BadgeTone, CollaboratorWithRelations, LeaveWithRelations } from '../types/domain';
+import { canResetDatabase, canManageMasterData } from '../lib/permissions';
 import { resetDatabase } from '../services/resetService';
 import { downloadFile } from '../utils/formatters';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
-const COMPLIANCE_LABELS: Record<string, string> = {
-  interjornada: 'Interjornada (< 11h)',
-  intrajornada: 'Intrajornada (almoço < 1h)',
-  batida_incompleta: 'Batida incompleta',
-  folga_amanha: 'Folga amanhã'
-};
+interface AlertRow {
+  key: string;
+  typeLabel: string;
+  tone: BadgeTone;
+  companyName: string;
+  collaborator: CollaboratorWithRelations;
+  cycleBalance: string;
+  details: string;
+  status: string;
+  actionText: string;
+  mailtoType: MailtoAlertType;
+  mailtoAction: string;
+  registerLeaveDate?: string;
+}
+
+const ALERT_KPI_NOTE_DESCRIPTION =
+  'Encerramento de ciclo com saldo positivo acima do limite · descumprimentos de interjornada/intrajornada · batidas de ponto incompletas · folgas programadas D-1';
 
 export function DashboardPage() {
   const { data, access, toast } = useAppContext();
   const [areaFilter, setAreaFilter] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
+  const [leaveModal, setLeaveModal] = useState<{ collaborator: CollaboratorWithRelations; date: string } | null>(null);
 
   const areas = useMemo(() => Array.from(new Set(data.collaborators.map((c) => c.area).filter(Boolean))).sort(), [data.collaborators]);
 
@@ -43,6 +60,116 @@ export function DashboardPage() {
       }),
     [data.collaborators, data.companies, data.managers, data.cycles, data.records, data.leaves, areaFilter]
   );
+
+  const alertCounts = useMemo(() => {
+    const ciclo = stats.cycleAlerts.length;
+    const interjornada = stats.complianceAlerts.filter((a) => a.type === 'interjornada').length;
+    const intrajornada = stats.complianceAlerts.filter((a) => a.type === 'intrajornada').length;
+    const batida = stats.complianceAlerts.filter((a) => a.type === 'batida_incompleta').length;
+    const folgaAmanha = stats.complianceAlerts.filter((a) => a.type === 'folga_amanha').length;
+    return { ciclo, interjornada, intrajornada, batida, folgaAmanha };
+  }, [stats.cycleAlerts, stats.complianceAlerts]);
+
+  const alertRows: AlertRow[] = useMemo(() => {
+    const rows: AlertRow[] = [];
+
+    for (const alert of stats.cycleAlerts) {
+      const cycleBalance = minutesToTime(alert.collaborator.cycle_balance_minutes || alert.collaborator.bank_hours_balance_minutes);
+      const details = `Saldo ${minutesToTime(alert.balanceMinutes)} acima do limite ${minutesToTime(alert.limitMinutes)}${
+        alert.hasFutureLeave ? ' — folga já programada' : ' — sem folga programada'
+      }`;
+      const actionText = alert.hasFutureLeave
+        ? 'Validar compensação programada com o colaborador.'
+        : 'Programar folga / alinhar com gestor para compensação do saldo.';
+      rows.push({
+        key: `cycle-${alert.collaborator.id}`,
+        typeLabel: 'Fechamento ciclo',
+        tone: 'danger',
+        companyName: alert.collaborator.company?.short_name ?? '-',
+        collaborator: alert.collaborator,
+        cycleBalance,
+        details,
+        status: alert.hasFutureLeave ? 'Folga programada' : 'Crítico',
+        actionText,
+        mailtoType: 'Alerta de ciclo',
+        mailtoAction: actionText
+      });
+    }
+
+    for (const alert of stats.complianceAlerts) {
+      const cycleBalance = minutesToTime(alert.collaborator.cycle_balance_minutes || alert.collaborator.bank_hours_balance_minutes);
+      const base = {
+        companyName: alert.collaborator.company?.short_name ?? '-',
+        collaborator: alert.collaborator,
+        cycleBalance,
+        details: alert.details
+      };
+      if (alert.type === 'interjornada') {
+        const actionText = 'Revisar escala e ajustar horários para garantir 11h de descanso.';
+        rows.push({
+          key: `interjornada-${alert.collaborator.id}`,
+          typeLabel: 'Interjornada',
+          tone: 'warning',
+          status: `${alert.count} ocorrência(s)`,
+          actionText,
+          mailtoType: 'Alerta de interjornada',
+          mailtoAction: actionText,
+          ...base
+        });
+      } else if (alert.type === 'intrajornada') {
+        const actionText = 'Verificar registros e garantir intervalo mínimo de 1h para refeição.';
+        rows.push({
+          key: `intrajornada-${alert.collaborator.id}`,
+          typeLabel: 'Intrajornada',
+          tone: 'warning',
+          status: `${alert.count} ocorrência(s)`,
+          actionText,
+          mailtoType: 'Alerta de intrajornada',
+          mailtoAction: actionText,
+          ...base
+        });
+      } else if (alert.type === 'batida_incompleta') {
+        const actionText = 'Registrar folga ou solicitar justificativa/regularização ao colaborador.';
+        rows.push({
+          key: `batida-${alert.collaborator.id}`,
+          typeLabel: 'Batida ponto',
+          tone: 'danger',
+          status: `${alert.count} ocorrência(s)`,
+          actionText,
+          mailtoType: 'Alerta de batida incompleta',
+          mailtoAction: actionText,
+          registerLeaveDate: alert.incompleteDays?.[0],
+          ...base
+        });
+      } else if (alert.type === 'folga_amanha') {
+        const actionText = 'Confirmar presença e comunicar gestor e equipe sobre a ausência de amanhã.';
+        rows.push({
+          key: `folga-${alert.collaborator.id}`,
+          typeLabel: 'Folga amanhã',
+          tone: 'info',
+          status: '1 ocorrência(s)',
+          actionText,
+          mailtoType: 'Folga amanhã',
+          mailtoAction: actionText,
+          ...base
+        });
+      }
+    }
+
+    return rows;
+  }, [stats.cycleAlerts, stats.complianceAlerts]);
+
+  const attentionFragments = useMemo(() => {
+    const fragments: string[] = [];
+    if (alertCounts.ciclo > 0) fragments.push(`${alertCounts.ciclo} alerta(s) de encerramento de ciclo`);
+    if (alertCounts.interjornada > 0) fragments.push(`${alertCounts.interjornada} colaborador(es) com violação de interjornada`);
+    if (alertCounts.intrajornada > 0) fragments.push(`${alertCounts.intrajornada} colaborador(es) com violação de intrajornada`);
+    if (alertCounts.batida > 0) fragments.push(`${alertCounts.batida} colaborador(es) com batidas incompletas`);
+    if (alertCounts.folgaAmanha > 0) fragments.push(`${alertCounts.folgaAmanha} colaborador(es) com folga programada para amanhã`);
+    return fragments;
+  }, [alertCounts]);
+
+  const alertKpiNote = `${alertCounts.ciclo} ciclo · ${alertCounts.interjornada} interjornada · ${alertCounts.intrajornada} intrajornada · ${alertCounts.batida} batida · ${alertCounts.folgaAmanha} folga D-1`;
 
   const leavesWithRelations: LeaveWithRelations[] = useMemo(
     () =>
@@ -73,6 +200,8 @@ export function DashboardPage() {
     [data.collaborators]
   );
 
+  const canManageLeaves = canManageMasterData(access.context.profile?.access_type);
+
   async function handleExportJson() {
     const payload = {
       companies: data.companies,
@@ -99,6 +228,29 @@ export function DashboardPage() {
       data.reload();
     } catch (error) {
       toast.notify(error instanceof Error ? error.message : 'Falha ao resetar a base.', 'danger');
+    }
+  }
+
+  async function handleNotify(row: AlertRow) {
+    try {
+      const { mailtoUrl } = await generateAndLogNotification(
+        { collaborator: row.collaborator, type: row.mailtoType, details: row.details, action: row.mailtoAction },
+        access.context.matricula
+      );
+      window.location.href = mailtoUrl;
+    } catch (error) {
+      toast.notify(error instanceof Error ? error.message : 'Falha ao gerar notificação.', 'danger');
+    }
+  }
+
+  async function handleRegisterLeave(payload: LeaveInput) {
+    try {
+      await createLeave(payload, access.context.matricula);
+      toast.notify('Folga registrada.', 'success');
+      setLeaveModal(null);
+      data.reload();
+    } catch (error) {
+      toast.notify(error instanceof Error ? error.message : 'Falha ao registrar folga.', 'danger');
     }
   }
 
@@ -132,6 +284,17 @@ export function DashboardPage() {
         </>
       }
     >
+      {stats.totalAlerts > 0 && (
+        <div className="alert-box">
+          <span className="alert-box-icon">!</span>
+          <div>
+            <h3>Atenção: existem itens que requerem ação do RH / Gestão.</h3>
+            <p>{attentionFragments.join(' · ')}</p>
+            <p style={{ marginTop: 4 }}>Critérios considerados: {ALERT_KPI_NOTE_DESCRIPTION}.</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid cards-4" style={{ marginBottom: 14 }}>
         <MetricCard title="Colaboradores monitorados" value={String(stats.total)} tone="neutral" />
         <MetricCard title="Saldo total de BH" value={minutesToTime(stats.balanceTotalMinutes)} tone="info" />
@@ -140,48 +303,69 @@ export function DashboardPage() {
         <MetricCard title="Saldo positivo" value={String(stats.positiveCount)} note="colaboradores" tone="success" />
         <MetricCard title="Saldo negativo" value={String(stats.negativeCount)} note="colaboradores" tone="danger" />
         <MetricCard title="Empresas encerrando ciclo" value={String(stats.closingCompanies.length)} tone="warning" />
-        <MetricCard title="Alertas do período" value={String(stats.totalAlerts)} tone={stats.totalAlerts > 0 ? 'danger' : 'neutral'} />
+        <MetricCard
+          title="Alertas do período"
+          value={String(stats.totalAlerts)}
+          note={alertKpiNote}
+          tone={stats.totalAlerts > 0 ? 'danger' : 'success'}
+        />
       </div>
 
       <div className="grid two-col">
         <div style={{ display: 'grid', gap: 14 }}>
           <div className="card">
             <h2 className="section-title">Alertas do período</h2>
-            {stats.totalAlerts === 0 ? (
-              <EmptyState message="Nenhum alerta identificado para o filtro atual." />
+            {!alertRows.length ? (
+              <EmptyState message="Nenhum alerta identificado para o período atual." />
             ) : (
               <div className="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Tipo</th>
-                      <th>Colaborador</th>
                       <th>Empresa</th>
+                      <th>Colaborador</th>
+                      <th>Saldo ciclo</th>
                       <th>Detalhes</th>
+                      <th>Status</th>
+                      <th>Ação sugerida</th>
+                      <th>Notificação</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.cycleAlerts.map((alert, idx) => (
-                      <tr key={`cycle-${idx}`}>
+                    {alertRows.map((row) => (
+                      <tr key={row.key}>
                         <td>
-                          <Badge label="Encerramento de ciclo" tone="danger" />
+                          <Badge label={row.typeLabel} tone={row.tone} />
                         </td>
-                        <td>{alert.collaborator.name}</td>
-                        <td>{alert.collaborator.company?.short_name ?? '-'}</td>
+                        <td>{row.companyName}</td>
+                        <td>{row.collaborator.name}</td>
+                        <td className="mono">{row.cycleBalance}</td>
+                        <td>{row.details}</td>
+                        <td>{row.status}</td>
                         <td>
-                          Saldo {minutesToTime(alert.balanceMinutes)} acima do limite {minutesToTime(alert.limitMinutes)}
-                          {alert.hasFutureLeave ? ' — folga já programada' : ' — sem folga programada'}
+                          {row.actionText}
+                          {row.registerLeaveDate && canManageLeaves && (
+                            <div style={{ marginTop: 6 }}>
+                              <Button
+                                size="small"
+                                variant="secondary"
+                                onClick={() => setLeaveModal({ collaborator: row.collaborator, date: row.registerLeaveDate! })}
+                              >
+                                Registrar folga
+                              </Button>
+                            </div>
+                          )}
                         </td>
-                      </tr>
-                    ))}
-                    {stats.complianceAlerts.map((alert, idx) => (
-                      <tr key={`compliance-${idx}`}>
                         <td>
-                          <Badge label={COMPLIANCE_LABELS[alert.type] ?? alert.type} tone={alert.type === 'folga_amanha' ? 'info' : 'warning'} />
+                          {hasCollaboratorEmail(row.collaborator) ? (
+                            <Button size="small" variant="secondary" onClick={() => handleNotify(row)}>
+                              Notificar
+                            </Button>
+                          ) : (
+                            <span className="muted small-text">Sem e-mail cadastrado</span>
+                          )}
                         </td>
-                        <td>{alert.collaborator.name}</td>
-                        <td>{alert.collaborator.company?.short_name ?? '-'}</td>
-                        <td>{alert.details}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -255,6 +439,23 @@ export function DashboardPage() {
       <p className="small-text" style={{ marginTop: 14 }}>
         Última atualização: {formatDate(new Date().toISOString().slice(0, 10))}
       </p>
+
+      <Modal
+        open={Boolean(leaveModal)}
+        title={`Registrar folga — ${leaveModal?.collaborator.name ?? ''}`}
+        description="Folga sugerida a partir do dia com batida incompleta identificado no alerta."
+        onClose={() => setLeaveModal(null)}
+      >
+        {leaveModal && (
+          <LeaveForm
+            collaborators={[leaveModal.collaborator]}
+            defaultDate={leaveModal.date || toISODate(new Date())}
+            onSubmit={handleRegisterLeave}
+            onCancel={() => setLeaveModal(null)}
+            submitting={false}
+          />
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={resetOpen}

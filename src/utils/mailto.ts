@@ -1,6 +1,12 @@
 import type { CollaboratorWithRelations } from '../types/domain';
 
-export type MailtoAlertType = 'Alerta de ciclo' | 'Alerta de interjornada' | 'Alerta de intrajornada' | 'Alerta de batida incompleta' | 'Folga registrada';
+export type MailtoAlertType =
+  | 'Alerta de ciclo'
+  | 'Alerta de interjornada'
+  | 'Alerta de intrajornada'
+  | 'Alerta de batida incompleta'
+  | 'Folga registrada'
+  | 'Folga amanhã';
 
 export interface MailtoAlertInput {
   collaborator: CollaboratorWithRelations;

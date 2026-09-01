@@ -45,6 +45,8 @@ export interface ComplianceAlert {
   details: string;
   leaveDate?: string;
   leaveReason?: string;
+  /** Datas ISO com batida incompleta (apenas para type === 'batida_incompleta'). */
+  incompleteDays?: string[];
 }
 
 export interface CycleAlert {
