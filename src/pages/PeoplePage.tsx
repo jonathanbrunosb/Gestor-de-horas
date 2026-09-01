@@ -18,7 +18,8 @@ import { createLeave, type LeaveInput } from '../services/leavesService';
 import { createAccessProfile, type AccessProfileInput } from '../services/accessProfilesService';
 import { canManageMasterData, canManageAccessProfiles, normalizeMatricula, accessTypeBadgeTone } from '../lib/permissions';
 import { getCollaboratorStatus } from '../utils/compliance';
-import { getCompanyConfig } from '../utils/cycles';
+import { getCompanyConfig, getCurrentCyclePeriod } from '../utils/cycles';
+import { getCollaboratorCycleBalance } from '../utils/periodBalances';
 import { minutesToTime } from '../utils/time';
 import { toISODate } from '../utils/dates';
 import type { CollaboratorRow, ManagerRow } from '../types/database';
@@ -229,7 +230,8 @@ export function PeoplePage() {
               <tbody>
                 {collaboratorRows.map((c) => {
                   const config = getCompanyConfig(data.cycles, c.company_id);
-                  const status = getCollaboratorStatus(c, config, data.leaves);
+                  const cycleBalanceMinutes = getCollaboratorCycleBalance(c.id, data.records, getCurrentCyclePeriod(config));
+                  const status = getCollaboratorStatus(c, cycleBalanceMinutes, config, data.leaves);
                   const manager = data.managers.find((m) => m.id === c.manager_id);
                   const accessProfile = accessProfileByRegistration.get(normalizeMatricula(c.registration));
                   return (
@@ -240,7 +242,7 @@ export function PeoplePage() {
                       <td>{c.email || <span className="muted">Sem e-mail</span>}</td>
                       <td>{c.title ?? '-'}</td>
                       <td>{manager?.name ?? c.legacy_manager_name ?? <span className="muted">-</span>}</td>
-                      <td className="mono">{minutesToTime(c.cycle_balance_minutes || c.bank_hours_balance_minutes)}</td>
+                      <td className="mono">{minutesToTime(cycleBalanceMinutes)}</td>
                       <td>
                         <StatusBadge status={status} />
                       </td>

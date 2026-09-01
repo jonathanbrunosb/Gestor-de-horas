@@ -68,7 +68,7 @@ export function CalendarPage() {
       company: data.companies.find((co) => co.id === c.company_id) ?? null,
       manager: data.managers.find((m) => m.id === c.manager_id) ?? null
     }));
-    const alerts = getCycleAlerts(withRelations, data.cycles, data.leaves);
+    const alerts = getCycleAlerts(withRelations, data.cycles, data.leaves, data.records);
     const set = new Set<string>();
     for (const alert of alerts) {
       const config = getCompanyConfig(data.cycles, alert.collaborator.company_id);
@@ -78,7 +78,7 @@ export function CalendarPage() {
       }
     }
     return set;
-  }, [data.collaborators, data.companies, data.managers, data.cycles, data.leaves]);
+  }, [data.collaborators, data.companies, data.managers, data.cycles, data.leaves, data.records]);
 
   const selectedLeaves = leavesByDay.get(selectedDate) ?? [];
 

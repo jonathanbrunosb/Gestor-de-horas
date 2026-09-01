@@ -2,7 +2,11 @@ import { getSupabase } from '../lib/supabaseClient';
 import type { LeaveRow } from '../types/database';
 import { recordAuditLog } from './auditLogService';
 
-export type LeaveInput = Omit<LeaveRow, 'id' | 'created_at' | 'updated_at'>;
+export type LeaveInput = Omit<LeaveRow, 'id' | 'created_at' | 'updated_at' | 'start_time' | 'end_time' | 'compensated_minutes'> & {
+  start_time?: string | null;
+  end_time?: string | null;
+  compensated_minutes?: number;
+};
 
 export async function listLeaves(): Promise<LeaveRow[]> {
   const supabase = getSupabase();

@@ -1,8 +1,8 @@
 import type { CollaboratorRow, CompanyCycleRow, CompanyRow, LeaveRow, ManagerRow, TimeRecordRow } from '../types/database';
 import type { CollaboratorWithRelations, CompanyCycleWithCompany, DashboardStats, RankingEntry } from '../types/domain';
-import { getComplianceAlerts, getCycleAlerts } from '../utils/compliance';
-import { isCycleClosingMonth } from '../utils/cycles';
-import { getCollaboratorPeriodBalance, getLatestPeriod } from '../utils/periodBalances';
+import { getComplianceAlerts, getCollaboratorStatus, getCycleAlerts } from '../utils/compliance';
+import { getCompanyConfig, getCurrentCyclePeriod, isCycleClosingMonth } from '../utils/cycles';
+import { getCollaboratorCycleBalance, getCollaboratorPeriodBalance, getLatestPeriod } from '../utils/periodBalances';
 
 /**
  * Composição pura de estatísticas do Dashboard a partir dos dados já
@@ -39,7 +39,7 @@ export function computeDashboardStats(options: {
     .filter((cfg) => isCycleClosingMonth(cfg))
     .map((cfg) => ({ ...cfg, company: companies.find((co) => co.id === cfg.company_id) ?? null }));
 
-  const cycleAlerts = getCycleAlerts(active, cycles, leaves);
+  const cycleAlerts = getCycleAlerts(active, cycles, leaves, records);
   const complianceAlerts = getComplianceAlerts(active, records, leaves);
 
   const effectivePeriod = monthFilter || getLatestPeriod(records);
@@ -48,10 +48,18 @@ export function computeDashboardStats(options: {
     ? active.map((c) => ({ collaborator: c, ...getCollaboratorPeriodBalance(c.id, records, effectivePeriod) }))
     : [];
 
-  const ranking: RankingEntry[] = [...periodBalances]
+  // Ranking de saldo/status do ciclo de compensação vigente — independente do
+  // filtro Mês (que rege as métricas de "no mês" acima), pois seu propósito é
+  // priorizar regularização antes do fechamento do ciclo, não de um mês específico.
+  const ranking: RankingEntry[] = [...active]
+    .map((c): RankingEntry => {
+      const config = getCompanyConfig(cycles, c.company_id);
+      const balanceMinutes = getCollaboratorCycleBalance(c.id, records, getCurrentCyclePeriod(config));
+      const status = getCollaboratorStatus(c, balanceMinutes, config, leaves);
+      return { collaborator: c, balanceMinutes, status };
+    })
     .sort((a, b) => b.balanceMinutes - a.balanceMinutes)
-    .slice(0, 8)
-    .map((p) => ({ collaborator: p.collaborator, balanceMinutes: p.balanceMinutes }));
+    .slice(0, 8);
 
   return {
     total: active.length,

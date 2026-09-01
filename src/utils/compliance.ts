@@ -3,7 +3,8 @@ import type { CollaboratorWithRelations, ComplianceAlert, CycleAlert } from '../
 import { NON_WORK_SCHEDULE_CODES } from '../lib/constants';
 import { formatDate, toISODate } from './dates';
 import { timeOfDayToMinutes } from './time';
-import { getCompanyConfig, isCycleClosingMonth, positiveAlertMinutes } from './cycles';
+import { getCompanyConfig, getCurrentCyclePeriod, isCycleClosingMonth, positiveAlertMinutes } from './cycles';
+import { getCollaboratorCycleBalance } from './periodBalances';
 
 /** Um registro conta como dia útil "de trabalho" (exclui feriado/DSR/compensado/férias). */
 export function isWorkingRecord(record: TimeRecordRow): boolean {
@@ -168,17 +169,25 @@ export function getComplianceAlerts(
   return alerts.sort((a, b) => b.count - a.count);
 }
 
-/** Alertas de encerramento de ciclo com saldo positivo acima do limite. */
+/**
+ * Alertas de encerramento de ciclo com saldo positivo acima do limite. O
+ * saldo é somado a partir dos registros de ponto do ciclo vigente (nunca da
+ * coluna estática cycle_balance_minutes do cadastro, que só é atualizada por
+ * importação de backup e fica desatualizada assim que uma nova competência é
+ * importada via upload de folha de ponto).
+ */
 export function getCycleAlerts(
   collaborators: CollaboratorWithRelations[],
   cycles: CompanyCycleRow[],
-  leaves: LeaveRow[]
+  leaves: LeaveRow[],
+  records: TimeRecordRow[]
 ): CycleAlert[] {
   return collaborators
     .filter((c) => c.status === 'Ativo')
     .map((c): CycleAlert => {
       const config = getCompanyConfig(cycles, c.company_id);
-      const balanceMinutes = c.cycle_balance_minutes || c.bank_hours_balance_minutes;
+      const cyclePeriod = getCurrentCyclePeriod(config);
+      const balanceMinutes = getCollaboratorCycleBalance(c.id, records, cyclePeriod);
       const limitMinutes = positiveAlertMinutes(config);
       const closing = isCycleClosingMonth(config);
       const futureLeave = hasFutureLeave(c.id, leaves);
@@ -188,18 +197,18 @@ export function getCycleAlerts(
     .sort((a, b) => b.balanceMinutes - a.balanceMinutes);
 }
 
-/** Status calculado de um colaborador — usado em tabelas e badges. */
+/** Status calculado de um colaborador a partir do saldo do ciclo vigente (ver getCollaboratorCycleBalance) — usado em tabelas e badges. */
 export function getCollaboratorStatus(
   collaborator: CollaboratorRow,
+  balanceMinutes: number,
   config: CompanyCycleRow | null,
   leaves: LeaveRow[]
 ): 'Regular' | 'Atenção' | 'Crítico' | 'Folga programada' | 'Inativo' {
   if (!collaborator || collaborator.status !== 'Ativo') return 'Inativo';
-  const balance = collaborator.cycle_balance_minutes || collaborator.bank_hours_balance_minutes;
   const positiveLimit = positiveAlertMinutes(config);
   const negativeLimit = config ? config.negative_alert_minutes : -300;
-  if (isCycleClosingMonth(config) && balance > positiveLimit) return 'Crítico';
+  if (isCycleClosingMonth(config) && balanceMinutes > positiveLimit) return 'Crítico';
   if (hasFutureLeave(collaborator.id, leaves)) return 'Folga programada';
-  if (balance > positiveLimit || balance < negativeLimit) return 'Atenção';
+  if (balanceMinutes > positiveLimit || balanceMinutes < negativeLimit) return 'Atenção';
   return 'Regular';
 }

@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/AppDataContext';
 import { PageContent } from '../components/layout/PageContent';
 import { MetricCard } from '../components/ui/MetricCard';
-import { Badge } from '../components/ui/Badge';
+import { Badge, StatusBadge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { CalendarGrid } from '../components/calendar/CalendarGrid';
 import { Modal } from '../components/ui/Modal';
 import { LeaveForm } from '../components/forms/LeaveForm';
 import { computeDashboardStats } from '../services/dashboardService';
 import { minutesToTime } from '../utils/time';
-import { getCycleSequence } from '../utils/cycles';
+import { getCompanyConfig, getCurrentCyclePeriod, getCycleSequence } from '../utils/cycles';
 import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
-import { listAvailablePeriods } from '../utils/periodBalances';
+import { listAvailablePeriods, getCollaboratorCycleBalance } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
@@ -42,6 +43,7 @@ const ALERT_KPI_NOTE_DESCRIPTION =
 
 export function DashboardPage() {
   const { data, access, toast } = useAppContext();
+  const navigate = useNavigate();
   const [areaFilter, setAreaFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
@@ -67,6 +69,16 @@ export function DashboardPage() {
 
   const periodLabel = stats.effectivePeriod ? formatPeriodLabel(stats.effectivePeriod) : 'sem dados importados';
 
+  /** Saldo do ciclo vigente por colaborador — usado nas colunas "Saldo ciclo" dos Alertas (fora do top 8 do ranking). */
+  const cycleBalanceByCollaboratorId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of data.collaborators) {
+      const config = getCompanyConfig(data.cycles, c.company_id);
+      map.set(c.id, getCollaboratorCycleBalance(c.id, data.records, getCurrentCyclePeriod(config)));
+    }
+    return map;
+  }, [data.collaborators, data.cycles, data.records]);
+
   const alertCounts = useMemo(() => {
     const ciclo = stats.cycleAlerts.length;
     const interjornada = stats.complianceAlerts.filter((a) => a.type === 'interjornada').length;
@@ -80,7 +92,7 @@ export function DashboardPage() {
     const rows: AlertRow[] = [];
 
     for (const alert of stats.cycleAlerts) {
-      const cycleBalance = minutesToTime(alert.collaborator.cycle_balance_minutes || alert.collaborator.bank_hours_balance_minutes);
+      const cycleBalance = minutesToTime(alert.balanceMinutes);
       const details = `Saldo ${minutesToTime(alert.balanceMinutes)} acima do limite ${minutesToTime(alert.limitMinutes)}${
         alert.hasFutureLeave ? ' — folga já programada' : ' — sem folga programada'
       }`;
@@ -103,7 +115,7 @@ export function DashboardPage() {
     }
 
     for (const alert of stats.complianceAlerts) {
-      const cycleBalance = minutesToTime(alert.collaborator.cycle_balance_minutes || alert.collaborator.bank_hours_balance_minutes);
+      const cycleBalance = minutesToTime(cycleBalanceByCollaboratorId.get(alert.collaborator.id) ?? 0);
       const base = {
         companyName: alert.collaborator.company?.short_name ?? '-',
         collaborator: alert.collaborator,
@@ -163,7 +175,7 @@ export function DashboardPage() {
     }
 
     return rows;
-  }, [stats.cycleAlerts, stats.complianceAlerts]);
+  }, [stats.cycleAlerts, stats.complianceAlerts, cycleBalanceByCollaboratorId]);
 
   const attentionFragments = useMemo(() => {
     const fragments: string[] = [];
@@ -386,28 +398,6 @@ export function DashboardPage() {
               </div>
             )}
           </div>
-
-          <div className="card">
-            <h2 className="section-title">Ranking de saldos por colaborador</h2>
-            <p className="section-subtitle">Competência {periodLabel} · maiores saldos (crédito − débito) do período.</p>
-            {!stats.ranking.length ? (
-              <EmptyState message="Nenhum registro de ponto importado para a competência selecionada." />
-            ) : (
-              <div className="list">
-                {stats.ranking.map((entry) => (
-                  <div key={entry.collaborator.id} className="list-item">
-                    <div>
-                      <div className="list-title">{entry.collaborator.name}</div>
-                      <div className="list-meta">{entry.collaborator.company?.short_name ?? '-'}</div>
-                    </div>
-                    <span className="mono" style={{ fontWeight: 700 }}>
-                      {minutesToTime(entry.balanceMinutes)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         <div style={{ display: 'grid', gap: 14 }}>
@@ -448,6 +438,52 @@ export function DashboardPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <h2 className="section-title">Ranking de saldos por colaborador</h2>
+        <p className="section-subtitle">
+          Visão rápida para priorizar compensações, alinhamentos com gestores e regularização antes do fechamento do ciclo.
+        </p>
+        {!stats.ranking.length ? (
+          <EmptyState message="Nenhum colaborador ativo para os filtros selecionados." />
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Empresa</th>
+                  <th>Saldo ciclo</th>
+                  <th>Status</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.ranking.map((entry) => (
+                  <tr key={entry.collaborator.id}>
+                    <td>
+                      <div className="list-title">{entry.collaborator.name}</div>
+                      <div className="list-meta mono">{entry.collaborator.registration}</div>
+                    </td>
+                    <td>{entry.collaborator.company?.short_name ?? '-'}</td>
+                    <td className="mono" style={{ fontWeight: 700 }}>
+                      {minutesToTime(entry.balanceMinutes)}
+                    </td>
+                    <td>
+                      <StatusBadge status={entry.status} />
+                    </td>
+                    <td>
+                      <Button size="small" variant="secondary" onClick={() => navigate(`/controle-horas?colaborador=${entry.collaborator.id}`)}>
+                        Detalhar
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <p className="small-text" style={{ marginTop: 14 }}>

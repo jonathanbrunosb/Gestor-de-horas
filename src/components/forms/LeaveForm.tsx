@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { CollaboratorRow, LeaveRow } from '../../types/database';
 import type { LeaveInput } from '../../services/leavesService';
 import { Button } from '../ui/Button';
+import { minutesToTime, timeOfDayToMinutes } from '../../utils/time';
 
 interface LeaveFormProps {
   initial?: LeaveRow | null;
@@ -17,6 +18,17 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
   const [date, setDate] = useState(initial?.leave_date ?? defaultDate);
   const [reason, setReason] = useState(initial?.reason ?? 'Compensação de banco de horas');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [startTime, setStartTime] = useState(initial?.start_time ?? '08:00');
+  const [endTime, setEndTime] = useState(initial?.end_time ?? '17:00');
+
+  const compensatedMinutes = useMemo(() => {
+    const start = timeOfDayToMinutes(startTime);
+    const end = timeOfDayToMinutes(endTime);
+    if (start < 0 || end < 0 || end <= start) return 0;
+    return end - start;
+  }, [startTime, endTime]);
+
+  const invalidRange = Boolean(startTime && endTime && compensatedMinutes === 0);
 
   function handleSubmit() {
     const collaborator = collaborators.find((c) => c.id === collaboratorId);
@@ -27,7 +39,10 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
       leave_date: date,
       reason: reason || 'Compensação de banco de horas',
       notes: notes || null,
-      source: initial?.source ?? 'manual'
+      source: initial?.source ?? 'manual',
+      start_time: startTime || null,
+      end_time: endTime || null,
+      compensated_minutes: compensatedMinutes
     });
   }
 
@@ -50,6 +65,25 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
+      <div className="form-row" style={{ marginTop: 12 }}>
+        <div className="field">
+          <label>Hora inicial</label>
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Hora final</label>
+          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Horas compensadas</label>
+          <input className="mono" value={minutesToTime(compensatedMinutes)} disabled />
+        </div>
+      </div>
+      {invalidRange && (
+        <p className="small-text" style={{ color: 'var(--danger)', marginTop: 6 }}>
+          Hora final deve ser depois da hora inicial para calcular as horas compensadas.
+        </p>
+      )}
       <div className="form-row" style={{ marginTop: 12 }}>
         <div className="field">
           <label>Motivo</label>

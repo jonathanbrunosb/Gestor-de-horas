@@ -8,11 +8,13 @@ import { Button } from '../components/ui/Button';
 import { usePersistedFilter } from '../hooks/useFilters';
 import { minutesToTime } from '../utils/time';
 import { getCollaboratorStatus } from '../utils/compliance';
-import { getCompanyConfig } from '../utils/cycles';
+import { getCompanyConfig, getCurrentCyclePeriod } from '../utils/cycles';
+import { getCollaboratorCycleBalance } from '../utils/periodBalances';
 import type { CollaboratorRow } from '../types/database';
 
 interface SummaryRow extends Omit<CollaboratorRow, 'status'> {
   companyName: string;
+  cycleBalanceMinutes: number;
   computedStatus: ReturnType<typeof getCollaboratorStatus>;
 }
 
@@ -28,7 +30,13 @@ export function SummaryPage() {
       .map((c) => {
         const company = data.companies.find((co) => co.id === c.company_id);
         const config = getCompanyConfig(data.cycles, c.company_id);
-        return { ...c, companyName: company?.short_name ?? '-', computedStatus: getCollaboratorStatus(c, config, data.leaves) };
+        const cycleBalanceMinutes = getCollaboratorCycleBalance(c.id, data.records, getCurrentCyclePeriod(config));
+        return {
+          ...c,
+          companyName: company?.short_name ?? '-',
+          cycleBalanceMinutes,
+          computedStatus: getCollaboratorStatus(c, cycleBalanceMinutes, config, data.leaves)
+        };
       })
       .filter((c) => !companyFilter || c.companyName === companyFilter)
       .filter((c) => !statusFilter || c.computedStatus === statusFilter)
@@ -38,7 +46,7 @@ export function SummaryPage() {
         return c.name.toLowerCase().includes(term) || c.registration.includes(term);
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [data.collaborators, data.companies, data.cycles, data.leaves, companyFilter, statusFilter, search]);
+  }, [data.collaborators, data.companies, data.cycles, data.leaves, data.records, companyFilter, statusFilter, search]);
 
   const columns: Array<DataTableColumn<SummaryRow>> = [
     { key: 'company', header: 'Empresa', render: (r) => r.companyName },
@@ -49,7 +57,7 @@ export function SummaryPage() {
     { key: 'credit', header: 'Crédito mês', render: (r) => <span className="mono">{minutesToTime(r.month_credit_minutes)}</span>, align: 'right' },
     { key: 'debit', header: 'Débito mês', render: (r) => <span className="mono">{minutesToTime(r.month_debit_minutes)}</span>, align: 'right' },
     { key: 'monthBalance', header: 'Saldo mês', render: (r) => <span className="mono">{minutesToTime(r.month_balance_minutes)}</span>, align: 'right' },
-    { key: 'cycleBalance', header: 'Saldo ciclo', render: (r) => <span className="mono">{minutesToTime(r.cycle_balance_minutes)}</span>, align: 'right' },
+    { key: 'cycleBalance', header: 'Saldo ciclo', render: (r) => <span className="mono">{minutesToTime(r.cycleBalanceMinutes)}</span>, align: 'right' },
     { key: 'extra50', header: 'Extra 50%', render: (r) => <span className="mono">{minutesToTime(r.extra_50_minutes)}</span>, align: 'right' },
     { key: 'extra100', header: 'Extra 100%', render: (r) => <span className="mono">{minutesToTime(r.extra_100_minutes)}</span>, align: 'right' },
     { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.computedStatus} /> },

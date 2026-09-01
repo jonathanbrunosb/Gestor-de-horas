@@ -60,7 +60,9 @@ export interface CycleAlert {
 
 export interface RankingEntry {
   collaborator: CollaboratorWithRelations;
+  /** Saldo do ciclo de compensação vigente (não do mês selecionado no filtro). */
   balanceMinutes: number;
+  status: 'Regular' | 'Atenção' | 'Crítico' | 'Folga programada' | 'Inativo';
 }
 
 export interface DashboardStats {

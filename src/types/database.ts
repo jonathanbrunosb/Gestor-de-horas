@@ -118,6 +118,9 @@ export interface LeaveRow {
   reason: string;
   notes: string | null;
   source: string;
+  start_time: string | null; // HH:MM
+  end_time: string | null; // HH:MM
+  compensated_minutes: number;
   created_at: string;
   updated_at: string;
 }
