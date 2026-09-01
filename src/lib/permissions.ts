@@ -14,7 +14,22 @@ export function isDeveloperMatricula(matricula: string | null | undefined): bool
 
 /** Perfis com acesso liberado ao sistema (qualquer coisa fora dessa lista = acesso negado). */
 export function isAuthorizedAccessType(accessType: AccessType | null | undefined): boolean {
-  return accessType === 'Desenvolvedor' || accessType === 'Administrador' || accessType === 'Gestor' || accessType === 'Facilitador';
+  return (
+    accessType === 'Desenvolvedor' ||
+    accessType === 'Administrador' ||
+    accessType === 'Gestor' ||
+    accessType === 'Facilitador' ||
+    accessType === 'Colaborador'
+  );
+}
+
+/**
+ * Perfil de autoatendimento: só pode abrir o próprio Controle de Horas,
+ * travado na matrícula do colaborador correspondente — nunca vê dados de
+ * outros colaboradores nem os demais módulos do sistema.
+ */
+export function isSelfServiceOnly(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Colaborador';
 }
 
 export function canManageAccessProfiles(accessType: AccessType | null | undefined): boolean {
@@ -31,7 +46,7 @@ export function canResetDatabase(accessType: AccessType | null | undefined): boo
 }
 
 export function canViewFinancials(accessType: AccessType | null | undefined): boolean {
-  return isAuthorizedAccessType(accessType);
+  return isAuthorizedAccessType(accessType) && !isSelfServiceOnly(accessType);
 }
 
 export function accessTypeBadgeTone(accessType: AccessType | null | undefined): 'dark' | 'info' | 'success' | 'neutral' | 'inactive' {
@@ -43,6 +58,8 @@ export function accessTypeBadgeTone(accessType: AccessType | null | undefined): 
     case 'Gestor':
       return 'success';
     case 'Facilitador':
+      return 'neutral';
+    case 'Colaborador':
       return 'neutral';
     default:
       return 'inactive';

@@ -4,7 +4,7 @@
  * armazenamento para todo saldo/duração — nunca strings "HH:MM" no banco.
  */
 
-export type AccessType = 'Desenvolvedor' | 'Administrador' | 'Gestor' | 'Facilitador' | 'Sem acesso';
+export type AccessType = 'Desenvolvedor' | 'Administrador' | 'Gestor' | 'Facilitador' | 'Colaborador' | 'Sem acesso';
 export type PersonStatus = 'Ativo' | 'Inativo';
 export type ImportStatus = 'Concluído' | 'Concluído com avisos' | 'Falhou';
 export type ImportFileType = 'csv' | 'txt' | 'pdf' | 'json';

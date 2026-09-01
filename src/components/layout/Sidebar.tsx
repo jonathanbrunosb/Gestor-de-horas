@@ -106,9 +106,12 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   footerText: string;
+  /** Perfil "Colaborador": só mostra o item Controle de Horas no menu. */
+  restrictToSelfService?: boolean;
 }
 
-export function Sidebar({ footerText }: SidebarProps) {
+export function Sidebar({ footerText, restrictToSelfService }: SidebarProps) {
+  const items = restrictToSelfService ? NAV_ITEMS.filter((item) => item.to === '/controle-horas') : NAV_ITEMS;
   return (
     <aside className="sidebar">
       <div className="logo-wrap">
@@ -131,7 +134,7 @@ export function Sidebar({ footerText }: SidebarProps) {
       <div className="sidebar-nav-wrap">
         <span className="sidebar-nav-label">Módulos</span>
         <nav className="nav">
-          {NAV_ITEMS.map((item) => (
+          {items.map((item) => (
             <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-btn${isActive ? ' active' : ''}`}>
               <span className="nav-ico">{item.icon}</span>
               {item.label}

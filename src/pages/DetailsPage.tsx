@@ -11,7 +11,7 @@ import { minutesToTime, timeToMinutes } from '../utils/time';
 import { formatDate } from '../utils/dates';
 import { deleteRecord, deleteRecordsBatch, updateRecord } from '../services/recordsService';
 import { downloadFile, toCSV } from '../utils/formatters';
-import { canManageMasterData } from '../lib/permissions';
+import { canManageMasterData, isSelfServiceOnly, normalizeMatricula } from '../lib/permissions';
 import type { TimeRecordRow } from '../types/database';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
@@ -28,8 +28,16 @@ export function DetailsPage() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const canEdit = canManageMasterData(access.context.profile?.access_type);
+  const selfServiceOnly = isSelfServiceOnly(access.context.profile?.access_type);
 
-  const collaborator = useMemo(() => data.collaborators.find((c) => c.id === collaboratorId) ?? null, [data.collaborators, collaboratorId]);
+  const ownCollaborator = useMemo(
+    () => data.collaborators.find((c) => normalizeMatricula(c.registration) === access.context.matricula) ?? null,
+    [data.collaborators, access.context.matricula]
+  );
+  // Perfil "Colaborador": ignora qualquer seleção/URL e trava no próprio cadastro.
+  const effectiveCollaboratorId = selfServiceOnly ? (ownCollaborator?.id ?? '') : collaboratorId;
+
+  const collaborator = useMemo(() => data.collaborators.find((c) => c.id === effectiveCollaboratorId) ?? null, [data.collaborators, effectiveCollaboratorId]);
   const company = useMemo(() => data.companies.find((c) => c.id === collaborator?.company_id) ?? null, [data.companies, collaborator]);
   const manager = useMemo(() => data.managers.find((m) => m.id === collaborator?.manager_id) ?? null, [data.managers, collaborator]);
 
@@ -37,9 +45,9 @@ export function DetailsPage() {
   const records = useMemo(
     () =>
       data.records
-        .filter((r) => r.collaborator_id === collaboratorId && (r.period === period || r.record_date?.startsWith(period)))
+        .filter((r) => r.collaborator_id === effectiveCollaboratorId && (r.period === period || r.record_date?.startsWith(period)))
         .sort((a, b) => a.record_date.localeCompare(b.record_date)),
-    [data.records, collaboratorId, period]
+    [data.records, effectiveCollaboratorId, period]
   );
 
   const summary = useMemo(() => {
@@ -122,23 +130,27 @@ export function DetailsPage() {
         <div className="filters four">
           <div className="field">
             <label>Colaborador</label>
-            <select
-              value={collaboratorId}
-              onChange={(e) => {
-                setCollaboratorId(e.target.value);
-                setSearchParams(e.target.value ? { colaborador: e.target.value } : {});
-              }}
-            >
-              <option value="">Selecione um colaborador</option>
-              {data.collaborators
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
+            {selfServiceOnly ? (
+              <input value={ownCollaborator?.name ?? 'Não vinculado'} disabled />
+            ) : (
+              <select
+                value={collaboratorId}
+                onChange={(e) => {
+                  setCollaboratorId(e.target.value);
+                  setSearchParams(e.target.value ? { colaborador: e.target.value } : {});
+                }}
+              >
+                <option value="">Selecione um colaborador</option>
+                {data.collaborators
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            )}
           </div>
           <div className="field">
             <label>Mês</label>
@@ -168,7 +180,13 @@ export function DetailsPage() {
       </div>
 
       {!collaborator ? (
-        <EmptyState message="Selecione um colaborador para visualizar o controle de horas." />
+        <EmptyState
+          message={
+            selfServiceOnly
+              ? 'Não encontramos um colaborador vinculado à sua matrícula na Base de Colaboradores. Fale com o administrador.'
+              : 'Selecione um colaborador para visualizar o controle de horas.'
+          }
+        />
       ) : (
         <>
           <div className="grid cards-4" style={{ marginBottom: 14 }}>

@@ -398,7 +398,7 @@ export function PeoplePage() {
       <Modal
         open={Boolean(accessProfileCollaborator)}
         title={`Criar perfil de acesso — ${accessProfileCollaborator?.name ?? ''}`}
-        description="Dados pré-preenchidos a partir do cadastro do colaborador. A matrícula não pode ser alterada aqui."
+        description="Dados pré-preenchidos a partir do cadastro do colaborador. A matrícula não pode ser alterada aqui. Perfil padrão 'Colaborador': acesso restrito ao próprio Controle de Horas."
         onClose={() => setAccessProfileCollaborator(null)}
       >
         {accessProfileCollaborator && (
@@ -409,7 +409,7 @@ export function PeoplePage() {
               email: accessProfileCollaborator.email,
               title: accessProfileCollaborator.title,
               area: accessProfileCollaborator.area,
-              access_type: 'Facilitador',
+              access_type: 'Colaborador',
               status: 'Ativo'
             }}
             onSubmit={handleCreateAccessProfile}

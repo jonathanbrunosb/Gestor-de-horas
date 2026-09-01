@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
 import { LoginProfilePage } from './pages/LoginProfilePage';
+import { isSelfServiceOnly } from './lib/permissions';
 
 function LoadingScreen() {
   return (
@@ -44,22 +45,33 @@ function AppShell() {
   if (!access.context.authorized) return <AccessDeniedPage />;
 
   const footerText = `${access.context.profile?.name ?? access.context.matricula} · ${access.context.role}`;
+  const selfServiceOnly = isSelfServiceOnly(access.context.profile?.access_type);
 
   return (
-    <AppLayout footerText={footerText}>
+    <AppLayout footerText={footerText} restrictToSelfService={selfServiceOnly}>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/resumo" element={<SummaryPage />} />
-        <Route path="/controle-horas" element={<DetailsPage />} />
-        <Route path="/calendario" element={<CalendarPage />} />
-        <Route path="/upload" element={<UploadPage />} />
-        <Route path="/gestao-bh" element={<ManagementPage />} />
-        <Route path="/configuracoes" element={<SettingsPage />} />
-        <Route path="/colaboradores" element={<PeoplePage />} />
-        <Route path="/acesso-negado" element={<AccessDeniedPage />} />
-        <Route path="/login" element={<LoginProfilePage />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {selfServiceOnly ? (
+          <>
+            {/* Perfil "Colaborador": único módulo acessível é o próprio Controle de Horas. */}
+            <Route path="/controle-horas" element={<DetailsPage />} />
+            <Route path="*" element={<Navigate to="/controle-horas" replace />} />
+          </>
+        ) : (
+          <>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/resumo" element={<SummaryPage />} />
+            <Route path="/controle-horas" element={<DetailsPage />} />
+            <Route path="/calendario" element={<CalendarPage />} />
+            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/gestao-bh" element={<ManagementPage />} />
+            <Route path="/configuracoes" element={<SettingsPage />} />
+            <Route path="/colaboradores" element={<PeoplePage />} />
+            <Route path="/acesso-negado" element={<AccessDeniedPage />} />
+            <Route path="/login" element={<LoginProfilePage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </>
+        )}
       </Routes>
       <ToastStack toasts={toast.toasts} />
     </AppLayout>
