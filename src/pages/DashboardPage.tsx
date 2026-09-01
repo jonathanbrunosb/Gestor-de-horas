@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/AppDataContext';
 import { PageContent } from '../components/layout/PageContent';
@@ -7,12 +7,13 @@ import { Badge, StatusBadge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { CalendarGrid } from '../components/calendar/CalendarGrid';
 import { Modal } from '../components/ui/Modal';
+import { Pagination } from '../components/ui/Pagination';
 import { LeaveForm } from '../components/forms/LeaveForm';
 import { computeDashboardStats } from '../services/dashboardService';
 import { minutesToTime } from '../utils/time';
 import { getCompanyConfig, getCurrentCyclePeriod, getCycleSequence } from '../utils/cycles';
 import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
-import { listAvailablePeriods, getCollaboratorCycleBalance } from '../utils/periodBalances';
+import { listSelectableMonths, getCollaboratorCycleBalance } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
@@ -48,9 +49,12 @@ export function DashboardPage() {
   const [monthFilter, setMonthFilter] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
   const [leaveModal, setLeaveModal] = useState<{ collaborator: CollaboratorWithRelations; date: string } | null>(null);
+  const [alertsPage, setAlertsPage] = useState(1);
+  const ALERTS_PAGE_SIZE = 10;
 
   const areas = useMemo(() => Array.from(new Set(data.collaborators.map((c) => c.area).filter(Boolean))).sort(), [data.collaborators]);
-  const availablePeriods = useMemo(() => listAvailablePeriods(data.records), [data.records]);
+  // Só janeiro até o mês atual do ano corrente — não lista meses futuros nem sem competência ainda alcançada.
+  const availablePeriods = useMemo(() => listSelectableMonths(), []);
 
   const stats = useMemo(
     () =>
@@ -176,6 +180,18 @@ export function DashboardPage() {
 
     return rows;
   }, [stats.cycleAlerts, stats.complianceAlerts, cycleBalanceByCollaboratorId]);
+
+  // Volta para a primeira página sempre que os filtros mudam a lista de alertas.
+  useEffect(() => {
+    setAlertsPage(1);
+  }, [areaFilter, monthFilter]);
+
+  const alertsPageCount = Math.max(1, Math.ceil(alertRows.length / ALERTS_PAGE_SIZE));
+  const alertsCurrentPage = Math.min(alertsPage, alertsPageCount);
+  const pagedAlertRows = useMemo(
+    () => alertRows.slice((alertsCurrentPage - 1) * ALERTS_PAGE_SIZE, alertsCurrentPage * ALERTS_PAGE_SIZE),
+    [alertRows, alertsCurrentPage]
+  );
 
   const attentionFragments = useMemo(() => {
     const fragments: string[] = [];
@@ -358,7 +374,7 @@ export function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {alertRows.map((row) => (
+                    {pagedAlertRows.map((row) => (
                       <tr key={row.key}>
                         <td>
                           <Badge label={row.typeLabel} tone={row.tone} />
@@ -397,6 +413,7 @@ export function DashboardPage() {
                 </table>
               </div>
             )}
+            <Pagination page={alertsCurrentPage} pageSize={ALERTS_PAGE_SIZE} totalItems={alertRows.length} onPageChange={setAlertsPage} />
           </div>
         </div>
 

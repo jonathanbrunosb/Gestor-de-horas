@@ -30,6 +30,22 @@ export function getLatestPeriod(records: TimeRecordRow[]): string | null {
 }
 
 /**
+ * Competências (YYYY-MM) disponíveis para seleção no filtro Mês: sempre de
+ * janeiro até o mês atual do ano corrente (independente de já haver ou não
+ * registro importado nesse mês) — mais recente primeiro. Não lista meses
+ * futuros nem de anos anteriores.
+ */
+export function listSelectableMonths(today: Date = new Date()): string[] {
+  const year = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const months: string[] = [];
+  for (let month = currentMonth; month >= 1; month--) {
+    months.push(`${year}-${String(month).padStart(2, '0')}`);
+  }
+  return months;
+}
+
+/**
  * Soma crédito/débito/saldo de banco de horas de um colaborador em uma
  * competência específica, a partir dos registros de ponto (nunca de colunas
  * estáticas do cadastro, que podem estar desatualizadas em relação aos
