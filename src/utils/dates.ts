@@ -41,6 +41,14 @@ export function isWeekendDate(date: Date): boolean {
   return day === 0 || day === 6;
 }
 
+/** "2026-08" -> "Agosto/2026" */
+export function formatPeriodLabel(period: string): string {
+  const [year, month] = period.split('-').map(Number);
+  if (!year || !month) return period;
+  const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
+  return label.charAt(0).toUpperCase() + label.slice(1).replace(' de ', '/');
+}
+
 export function addMonths(year: number, month: number, n: number): string {
   const t = (year - 1) * 12 + (month - 1) + n;
   return `${Math.floor(t / 12) + 1}-${String((t % 12) + 1).padStart(2, '0')}`;

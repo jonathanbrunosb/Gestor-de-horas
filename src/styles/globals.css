@@ -101,6 +101,25 @@ textarea:focus {
   grid-template-columns: repeat(3, minmax(150px, 1fr));
 }
 
+.filter-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-inline label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.filter-inline select {
+  min-width: 150px;
+  width: auto;
+}
+
 /* ══════════════════════════════════════
    UTILITIES
 ══════════════════════════════════════ */
@@ -151,6 +170,10 @@ textarea:focus {
 .grid {
   display: grid;
   gap: 14px;
+}
+
+.grid > * {
+  min-width: 0;
 }
 
 .grid.cards-4 {

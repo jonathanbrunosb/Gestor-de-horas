@@ -192,9 +192,10 @@
   border-bottom: 1px solid var(--border-light);
   padding: 14px 28px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -230,7 +231,8 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
   align-items: center;
 }
 

@@ -10,7 +10,8 @@ import { LeaveForm } from '../components/forms/LeaveForm';
 import { computeDashboardStats } from '../services/dashboardService';
 import { minutesToTime } from '../utils/time';
 import { getCycleSequence } from '../utils/cycles';
-import { formatDate, toISODate } from '../utils/dates';
+import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
+import { listAvailablePeriods } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
@@ -42,10 +43,12 @@ const ALERT_KPI_NOTE_DESCRIPTION =
 export function DashboardPage() {
   const { data, access, toast } = useAppContext();
   const [areaFilter, setAreaFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
   const [leaveModal, setLeaveModal] = useState<{ collaborator: CollaboratorWithRelations; date: string } | null>(null);
 
   const areas = useMemo(() => Array.from(new Set(data.collaborators.map((c) => c.area).filter(Boolean))).sort(), [data.collaborators]);
+  const availablePeriods = useMemo(() => listAvailablePeriods(data.records), [data.records]);
 
   const stats = useMemo(
     () =>
@@ -56,10 +59,13 @@ export function DashboardPage() {
         cycles: data.cycles,
         records: data.records,
         leaves: data.leaves,
-        areaFilter
+        areaFilter,
+        monthFilter
       }),
-    [data.collaborators, data.companies, data.managers, data.cycles, data.records, data.leaves, areaFilter]
+    [data.collaborators, data.companies, data.managers, data.cycles, data.records, data.leaves, areaFilter, monthFilter]
   );
+
+  const periodLabel = stats.effectivePeriod ? formatPeriodLabel(stats.effectivePeriod) : 'sem dados importados';
 
   const alertCounts = useMemo(() => {
     const ciclo = stats.cycleAlerts.length;
@@ -191,15 +197,6 @@ export function DashboardPage() {
     return map;
   }, [leavesWithRelations]);
 
-  const ranking = useMemo(
-    () =>
-      [...data.collaborators]
-        .filter((c) => c.status === 'Ativo')
-        .sort((a, b) => (b.cycle_balance_minutes || b.bank_hours_balance_minutes) - (a.cycle_balance_minutes || a.bank_hours_balance_minutes))
-        .slice(0, 8),
-    [data.collaborators]
-  );
-
   const canManageLeaves = canManageMasterData(access.context.profile?.access_type);
 
   async function handleExportJson() {
@@ -262,13 +259,24 @@ export function DashboardPage() {
       description="Visão consolidada dos saldos de banco de horas, ciclos de compensação e folgas programadas."
       actions={
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Área</label>
-            <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)} style={{ minWidth: 160 }}>
+          <div className="filter-inline">
+            <label>Área</label>
+            <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)}>
               <option value="">Consolidado (todos)</option>
               {areas.map((area) => (
                 <option key={area} value={area}>
                   {area}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-inline">
+            <label>Mês</label>
+            <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+              <option value="">Mais recente importado{stats.effectivePeriod ? ` (${formatPeriodLabel(stats.effectivePeriod)})` : ''}</option>
+              {availablePeriods.map((period) => (
+                <option key={period} value={period}>
+                  {formatPeriodLabel(period)}
                 </option>
               ))}
             </select>
@@ -295,11 +303,16 @@ export function DashboardPage() {
         </div>
       )}
 
+      <p className="small-text" style={{ marginBottom: 10 }}>
+        Saldos, créditos, débitos e ranking abaixo refletem a competência <strong>{periodLabel}</strong>
+        {areaFilter ? <> · área <strong>{areaFilter}</strong></> : null} — calculados a partir dos últimos registros de ponto importados.
+      </p>
+
       <div className="grid cards-4" style={{ marginBottom: 14 }}>
         <MetricCard title="Colaboradores monitorados" value={String(stats.total)} tone="neutral" />
-        <MetricCard title="Saldo total de BH" value={minutesToTime(stats.balanceTotalMinutes)} tone="info" />
-        <MetricCard title="Créditos no mês" value={minutesToTime(stats.creditTotalMinutes)} tone="success" />
-        <MetricCard title="Débitos no mês" value={minutesToTime(stats.debitTotalMinutes)} tone="warning" />
+        <MetricCard title="Saldo do mês" value={minutesToTime(stats.balanceTotalMinutes)} note={periodLabel} tone="info" />
+        <MetricCard title="Créditos no mês" value={minutesToTime(stats.creditTotalMinutes)} note={periodLabel} tone="success" />
+        <MetricCard title="Débitos no mês" value={minutesToTime(stats.debitTotalMinutes)} note={periodLabel} tone="warning" />
         <MetricCard title="Saldo positivo" value={String(stats.positiveCount)} note="colaboradores" tone="success" />
         <MetricCard title="Saldo negativo" value={String(stats.negativeCount)} note="colaboradores" tone="danger" />
         <MetricCard title="Empresas encerrando ciclo" value={String(stats.closingCompanies.length)} tone="warning" />
@@ -376,18 +389,19 @@ export function DashboardPage() {
 
           <div className="card">
             <h2 className="section-title">Ranking de saldos por colaborador</h2>
-            {!ranking.length ? (
-              <EmptyState message="Sem colaboradores ativos." />
+            <p className="section-subtitle">Competência {periodLabel} · maiores saldos (crédito − débito) do período.</p>
+            {!stats.ranking.length ? (
+              <EmptyState message="Nenhum registro de ponto importado para a competência selecionada." />
             ) : (
               <div className="list">
-                {ranking.map((c) => (
-                  <div key={c.id} className="list-item">
+                {stats.ranking.map((entry) => (
+                  <div key={entry.collaborator.id} className="list-item">
                     <div>
-                      <div className="list-title">{c.name}</div>
-                      <div className="list-meta">{data.companies.find((co) => co.id === c.company_id)?.short_name ?? '-'}</div>
+                      <div className="list-title">{entry.collaborator.name}</div>
+                      <div className="list-meta">{entry.collaborator.company?.short_name ?? '-'}</div>
                     </div>
                     <span className="mono" style={{ fontWeight: 700 }}>
-                      {minutesToTime(c.cycle_balance_minutes || c.bank_hours_balance_minutes)}
+                      {minutesToTime(entry.balanceMinutes)}
                     </span>
                   </div>
                 ))}

@@ -58,6 +58,11 @@ export interface CycleAlert {
   hasFutureLeave: boolean;
 }
 
+export interface RankingEntry {
+  collaborator: CollaboratorWithRelations;
+  balanceMinutes: number;
+}
+
 export interface DashboardStats {
   total: number;
   balanceTotalMinutes: number;
@@ -69,6 +74,10 @@ export interface DashboardStats {
   cycleAlerts: CycleAlert[];
   complianceAlerts: ComplianceAlert[];
   totalAlerts: number;
+  /** Competência (YYYY-MM) efetivamente usada nos números acima — a selecionada no filtro Mês, ou a mais recente com dados importados. */
+  effectivePeriod: string | null;
+  /** Ranking de saldo do período (dia-mês, a partir dos registros de ponto importados). */
+  ranking: RankingEntry[];
 }
 
 export interface CyclePeriod {

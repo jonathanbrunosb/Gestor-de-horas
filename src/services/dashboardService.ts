@@ -1,11 +1,19 @@
 import type { CollaboratorRow, CompanyCycleRow, CompanyRow, LeaveRow, ManagerRow, TimeRecordRow } from '../types/database';
-import type { CollaboratorWithRelations, CompanyCycleWithCompany, DashboardStats } from '../types/domain';
+import type { CollaboratorWithRelations, CompanyCycleWithCompany, DashboardStats, RankingEntry } from '../types/domain';
 import { getComplianceAlerts, getCycleAlerts } from '../utils/compliance';
 import { isCycleClosingMonth } from '../utils/cycles';
+import { getCollaboratorPeriodBalance, getLatestPeriod } from '../utils/periodBalances';
 
 /**
  * Composição pura de estatísticas do Dashboard a partir dos dados já
  * carregados em memória (via useAppData) — não faz chamadas de rede.
+ *
+ * Os números de saldo/crédito/débito e o ranking são sempre calculados a
+ * partir dos registros de ponto (time_records) da competência efetiva
+ * (a selecionada no filtro Mês, ou a mais recente com dados importados) —
+ * nunca das colunas estáticas de saldo do cadastro do colaborador, que só
+ * são atualizadas por importação de backup e ficam desatualizadas assim
+ * que uma nova competência é importada via upload de folha de ponto.
  */
 export function computeDashboardStats(options: {
   collaborators: CollaboratorRow[];
@@ -15,8 +23,9 @@ export function computeDashboardStats(options: {
   records: TimeRecordRow[];
   leaves: LeaveRow[];
   areaFilter?: string;
+  monthFilter?: string;
 }): DashboardStats {
-  const { collaborators, companies, managers, cycles, records, leaves, areaFilter } = options;
+  const { collaborators, companies, managers, cycles, records, leaves, areaFilter, monthFilter } = options;
 
   const withRelations: CollaboratorWithRelations[] = collaborators.map((c) => ({
     ...c,
@@ -33,18 +42,29 @@ export function computeDashboardStats(options: {
   const cycleAlerts = getCycleAlerts(active, cycles, leaves);
   const complianceAlerts = getComplianceAlerts(active, records, leaves);
 
-  const balanceOf = (c: CollaboratorRow) => c.cycle_balance_minutes || c.bank_hours_balance_minutes;
+  const effectivePeriod = monthFilter || getLatestPeriod(records);
+
+  const periodBalances = effectivePeriod
+    ? active.map((c) => ({ collaborator: c, ...getCollaboratorPeriodBalance(c.id, records, effectivePeriod) }))
+    : [];
+
+  const ranking: RankingEntry[] = [...periodBalances]
+    .sort((a, b) => b.balanceMinutes - a.balanceMinutes)
+    .slice(0, 8)
+    .map((p) => ({ collaborator: p.collaborator, balanceMinutes: p.balanceMinutes }));
 
   return {
     total: active.length,
-    balanceTotalMinutes: active.reduce((sum, c) => sum + balanceOf(c), 0),
-    creditTotalMinutes: active.reduce((sum, c) => sum + c.month_credit_minutes, 0),
-    debitTotalMinutes: active.reduce((sum, c) => sum + c.month_debit_minutes, 0),
-    positiveCount: active.filter((c) => balanceOf(c) > 0).length,
-    negativeCount: active.filter((c) => balanceOf(c) < 0).length,
+    balanceTotalMinutes: periodBalances.reduce((sum, p) => sum + p.balanceMinutes, 0),
+    creditTotalMinutes: periodBalances.reduce((sum, p) => sum + p.creditMinutes, 0),
+    debitTotalMinutes: periodBalances.reduce((sum, p) => sum + p.debitMinutes, 0),
+    positiveCount: periodBalances.filter((p) => p.balanceMinutes > 0).length,
+    negativeCount: periodBalances.filter((p) => p.balanceMinutes < 0).length,
     closingCompanies,
     cycleAlerts,
     complianceAlerts,
-    totalAlerts: cycleAlerts.length + complianceAlerts.length
+    totalAlerts: cycleAlerts.length + complianceAlerts.length,
+    effectivePeriod,
+    ranking
   };
 }

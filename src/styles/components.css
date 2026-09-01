@@ -89,6 +89,11 @@
   border-radius: var(--r-lg);
   padding: 18px;
   box-shadow: var(--shadow-sm);
+  /* Sem isso, um filho com min-width grande (ex.: tabela com min-width:900px
+     dentro de .table-wrap) força o card — e toda a cadeia de grids/flex
+     ancestrais — a estourar a largura da viewport, já que o valor padrão de
+     min-width de um item de grid/flex é "auto" (= tamanho mínimo do conteúdo). */
+  min-width: 0;
 }
 
 .metric-card {
