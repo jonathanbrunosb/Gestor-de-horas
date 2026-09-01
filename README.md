@@ -125,6 +125,17 @@ Hoje está fixo em `/` porque o projeto usa domínio próprio (`public/CNAME`),
 servido na raiz. Sem domínio próprio, o valor correto seria
 `/<nome-do-repo>/` (URL padrão `<usuario>.github.io/<repo>/`).
 
+**Roteamento client-side (React Router) em GitHub Pages:** GitHub Pages não
+tem roteamento de servidor — ao recarregar (F5) ou abrir diretamente uma
+rota como `/dashboard`, ele procura um arquivo físico nesse caminho e
+retorna 404. O workflow copia `dist/index.html` para `dist/404.html` depois
+do build (`Create 404.html for SPA client-side routing`); o GitHub Pages
+serve esse arquivo para qualquer rota sem correspondência física, o app
+carrega normalmente e o `BrowserRouter` assume o roteamento a partir da URL
+já na barra de endereço. Se algum dia o app passar a rodar num subcaminho
+diferente de `/`, esse truque continua funcionando sem ajuste, já que os
+caminhos de asset no `index.html` são absolutos (`base: '/'`).
+
 ### 9.1 Domínio próprio (subdomínio)
 
 Este projeto está configurado para `gestorhoras.contabilidade-eqtl.com`

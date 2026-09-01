@@ -44,6 +44,15 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
+      - name: Create 404.html for SPA client-side routing
+        # GitHub Pages não tem roteamento de servidor: ao recarregar (F5) ou
+        # abrir diretamente uma rota do React Router (ex.: /dashboard), ele
+        # procura um arquivo físico nesse caminho e retorna 404. Servindo uma
+        # cópia do index.html como 404.html, o app carrega normalmente e o
+        # BrowserRouter assume o roteamento a partir da URL já na barra de
+        # endereço (truque padrão para SPAs no GitHub Pages).
+        run: cp dist/index.html dist/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
