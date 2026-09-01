@@ -117,11 +117,32 @@ automaticamente a cada push em `main`, usando GitHub Actions + Pages.
    `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (o workflow os injeta no
    build).
 3. Faça push em `main` — o site fica disponível em
-   `https://<usuario>.github.io/<repositorio>/`.
+   `https://<usuario>.github.io/<repositorio>/` (ou no domínio próprio, se
+   configurado — ver seção 9.1).
 
-O `base` do Vite é calculado dinamicamente a partir do nome do repositório
-(`GITHUB_PAGES_BASE=/${{ github.event.repository.name }}/`), então o deploy
-funciona sem editar `vite.config.ts` mesmo se o repositório for renomeado.
+O `base` do Vite é definido pela variável `GITHUB_PAGES_BASE` no workflow.
+Hoje está fixo em `/` porque o projeto usa domínio próprio (`public/CNAME`),
+servido na raiz. Sem domínio próprio, o valor correto seria
+`/<nome-do-repo>/` (URL padrão `<usuario>.github.io/<repo>/`).
+
+### 9.1 Domínio próprio (subdomínio)
+
+Este projeto está configurado para `gestorhoras.contabilidade-eqtl.com`
+(arquivo `public/CNAME`). Para apontar para outro domínio/subdomínio:
+
+1. **DNS** — no provedor onde o domínio está registrado, crie um registro
+   `CNAME`: host `gestorhoras` (ou o subdomínio desejado) apontando para
+   `<usuario>.github.io` (sem o nome do repositório).
+2. **`public/CNAME`** — edite o arquivo com o novo domínio (uma linha, sem
+   `https://` e sem barra no final) e faça o deploy.
+3. **GitHub** — em **Settings → Pages → Custom domain**, informe o mesmo
+   domínio e salve. O GitHub roda uma verificação de DNS (pode levar alguns
+   minutos a algumas horas) e emite certificado HTTPS automaticamente.
+4. Depois que o certificado for emitido, marque **Enforce HTTPS** na mesma
+   tela.
+
+Se o domínio próprio for removido, apague `public/CNAME` e troque
+`GITHUB_PAGES_BASE` no workflow de volta para `/${{ github.event.repository.name }}/`.
 
 ## 10. Controle de acesso — como funciona (e suas limitações)
 

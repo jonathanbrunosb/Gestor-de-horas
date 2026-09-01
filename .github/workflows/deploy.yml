@@ -36,7 +36,10 @@ jobs:
 
       - name: Build
         env:
-          GITHUB_PAGES_BASE: /${{ github.event.repository.name }}/
+          # Domínio próprio (public/CNAME) é servido na raiz — base é '/'.
+          # Se o CNAME for removido e o site voltar a usar o domínio padrão
+          # <usuario>.github.io/<repo>/, troque para /${{ github.event.repository.name }}/.
+          GITHUB_PAGES_BASE: /
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
