@@ -177,22 +177,47 @@ em **Configurações → Perfis de acesso**, cadastre os demais usuários
 ## 12. Como migrar a base JSON legada
 
 Em **Configurações → Base compartilhada**, use *Exportar backup JSON* para
-gerar um snapshot a qualquer momento. Para importar uma base JSON exportada
-do sistema antigo (ou desta aplicação):
-1. Acesse **Upload de Arquivos**.
-2. Arraste o arquivo `.json` — a normalização aceita os campos legados
-   (`nome`/`name`/`colaborador`, `matricula`/`registration`, `gestorEmail`,
-   `perfisAcesso`/`userProfiles`/`accessProfiles`, etc. — ver
-   `src/types/imports.ts` e `src/utils/imports.ts`).
-3. A importação **nunca** duplica colaboradores/gestores (chave
-   empresa+matrícula / matrícula), **nunca** cria gestores automaticamente a
-   partir do texto do colaborador e **nunca** sobrescreve o perfil protegido
-   do Desenvolvedor.
+gerar um snapshot a qualquer momento.
 
-Para uma migração completa e assistida da base de produção antiga
-(colaboradores, gestores, perfis, cartões-ponto), use a lógica de
-`src/services/jsonImportService.ts` como referência — ela mescla com o que já
-existe no Supabase sem apagar nada.
+### 12.1 Migração completa (recomendada) — `scripts/migrate-legacy-json.mjs`
+
+Para trazer um export completo do sistema antigo (`collaborators`,
+`managers`, `records`, `leaves`, `cycles`, `userProfiles`, `gestaoConfig` —
+o formato salvo como `monitor-controles-horas-db.json`), use o script de
+migração incluído no projeto. Ele roda **localmente** (nunca dentro deste
+repositório publicado), com acesso direto ao Supabase:
+
+```bash
+npm install   # se ainda não tiver feito
+VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co \
+VITE_SUPABASE_ANON_KEY=eyJ... \
+npm run migrate:legacy -- caminho/para/monitor-controles-horas-db.json
+```
+
+O que ele faz:
+- Casa colaboradores por empresa+matrícula e gestores/perfis por matrícula —
+  **atualiza** se já existir, **cria** se não existir (nunca duplica).
+- Converte todos os saldos de `"HH:MM"` para minutos inteiros.
+- Vincula colaborador → gestor pela `gestorMatricula` (nunca pelo nome).
+- Importa registros de ponto e folgas em lote, ignorando duplicados pelas
+  mesmas constraints únicas do schema (seguro rodar mais de uma vez).
+- **Nunca** rebaixa o perfil protegido do Desenvolvedor (`u1205385`), mesmo
+  que o JSON traga outro tipo de acesso para essa matrícula.
+
+⚠️ O arquivo JSON de origem normalmente contém dados reais de colaboradores
+(nome, e-mail, matrícula, saldos). Não o commite neste repositório — rode o
+script a partir de uma cópia local, fora do controle de versão.
+
+### 12.2 Importação avulsa pela interface (Upload de Arquivos)
+
+Para adicionar/atualizar um cartão-ponto pontual (não uma base completa),
+use a tela **Upload de Arquivos** — aceita CSV/TXT/PDF, e também um JSON no
+formato de registros avulsos (campo `records`, um item por linha de
+cartão-ponto). A normalização aceita os campos legados
+(`nome`/`name`/`colaborador`, `matricula`/`registration`, `gestorEmail`, etc.
+— ver `src/types/imports.ts` e `src/utils/imports.ts`). Essa importação
+também nunca duplica colaboradores/gestores nem cria gestores automaticamente
+a partir do texto do colaborador.
 
 ## 13. Importação de cartão-ponto (CSV/TXT/PDF/JSON)
 
