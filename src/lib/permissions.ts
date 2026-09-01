@@ -23,7 +23,8 @@ export function isAuthorizedAccessType(accessType: AccessType | null | undefined
   return (
     accessType === 'Desenvolvedor' ||
     accessType === 'Administrador' ||
-    accessType === 'Gestor' ||
+    accessType === 'Executivo' ||
+    accessType === 'Gerente' ||
     accessType === 'Facilitador' ||
     accessType === 'Colaborador'
   );
@@ -36,6 +37,16 @@ export function isAuthorizedAccessType(accessType: AccessType | null | undefined
  */
 export function isSelfServiceOnly(accessType: AccessType | null | undefined): boolean {
   return accessType === 'Colaborador';
+}
+
+/**
+ * Perfil "Executivo": enxerga só os colaboradores do próprio time (vinculado
+ * pela matrícula ao registro de gestor correspondente em `managers`, e daí
+ * aos colaboradores com esse `manager_id`) — nunca a base inteira. O perfil
+ * "Gerente" (e os demais não-restritos) continuam vendo tudo, sem esse corte.
+ */
+export function isTeamScopedAccess(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Executivo';
 }
 
 export function canManageAccessProfiles(accessType: AccessType | null | undefined): boolean {
@@ -61,8 +72,10 @@ export function accessTypeBadgeTone(accessType: AccessType | null | undefined): 
       return 'dark';
     case 'Administrador':
       return 'info';
-    case 'Gestor':
+    case 'Gerente':
       return 'success';
+    case 'Executivo':
+      return 'neutral';
     case 'Facilitador':
       return 'neutral';
     case 'Colaborador':

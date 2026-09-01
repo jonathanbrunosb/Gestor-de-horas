@@ -177,7 +177,7 @@ export interface NormalizedLegacyAccessProfile {
   name: string;
   registration: string;
   email: string;
-  accessType: 'Desenvolvedor' | 'Administrador' | 'Gestor' | 'Facilitador' | 'Sem acesso';
+  accessType: 'Desenvolvedor' | 'Administrador' | 'Executivo' | 'Gerente' | 'Facilitador' | 'Sem acesso';
   title?: string;
   area?: string;
   notes?: string;
@@ -189,8 +189,15 @@ const ACCESS_TYPE_ALIASES: Record<string, NormalizedLegacyAccessProfile['accessT
   developer: 'Desenvolvedor',
   administrador: 'Administrador',
   admin: 'Administrador',
-  gestor: 'Gestor',
-  manager: 'Gestor',
+  // "gestor"/"manager" é o nome legado do perfil que enxergava tudo — mapeia
+  // para "Gerente" (o sucessor com a mesma visão irrestrita), não para
+  // "Executivo" (o novo perfil restrito ao próprio time, que não existia
+  // nos backups antigos e exigiria uma decisão manual por pessoa).
+  gestor: 'Gerente',
+  manager: 'Gerente',
+  gerente: 'Gerente',
+  executivo: 'Executivo',
+  executive: 'Executivo',
   facilitador: 'Facilitador',
   'sem acesso': 'Sem acesso'
 };

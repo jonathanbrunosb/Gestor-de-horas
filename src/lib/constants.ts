@@ -21,7 +21,7 @@ export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export const DEVELOPER_MATRICULA = 'u1205385';
 
-export const ACCESS_PROFILE_TYPES = ['Desenvolvedor', 'Administrador', 'Gestor', 'Facilitador', 'Colaborador', 'Sem acesso'] as const;
+export const ACCESS_PROFILE_TYPES = ['Desenvolvedor', 'Administrador', 'Executivo', 'Gerente', 'Facilitador', 'Colaborador', 'Sem acesso'] as const;
 
 export const DEFAULT_POSITIVE_ALERT_MINUTES = 600; // 10:00
 export const DEFAULT_NEGATIVE_ALERT_MINUTES = -300; // -05:00
