@@ -2,10 +2,16 @@ import type { AccessType } from '../types/database';
 import { DEVELOPER_MATRICULA } from './constants';
 
 export function normalizeMatricula(value: string | null | undefined): string {
-  return String(value ?? '')
+  const normalized = String(value ?? '')
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '');
+  // Matrículas puramente numéricas às vezes chegam com zeros à esquerda
+  // inconsistentes entre uploads de períodos diferentes (ex.: "1009912" x
+  // "001009912" para a mesma pessoa) — trata como o mesmo valor para não
+  // duplicar cadastro. Matrículas alfanuméricas (ex.: "u1205385") não são
+  // afetadas.
+  return /^\d+$/.test(normalized) ? normalized.replace(/^0+(?=\d)/, '') : normalized;
 }
 
 export function isDeveloperMatricula(matricula: string | null | undefined): boolean {

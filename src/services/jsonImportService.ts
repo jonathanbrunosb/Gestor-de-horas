@@ -130,7 +130,9 @@ export async function importLegacyJson(
 
   // 3. Colaboradores (com saldos convertidos para minutos)
   const { data: existingCollaborators } = await supabase.from('collaborators').select('*');
-  const collaboratorsByKey = new Map<string, CollaboratorRow>((existingCollaborators ?? []).map((c) => [`${c.company_id}:${c.registration}`, c]));
+  const collaboratorsByKey = new Map<string, CollaboratorRow>(
+    (existingCollaborators ?? []).map((c) => [`${c.company_id}:${normalizeMatricula(c.registration)}`, c])
+  );
   const collaboratorByLegacyId = new Map<string, CollaboratorRow>();
   const fallbackLeaves: Array<{ collaboratorLegacyId: string; date: string; reason: string }> = [];
 

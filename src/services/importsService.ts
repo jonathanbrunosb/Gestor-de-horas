@@ -40,7 +40,9 @@ export async function confirmImport(options: ConfirmImportOptions): Promise<Impo
   };
   const messages: string[] = [];
 
-  const collaboratorCache = new Map<string, CollaboratorRow>(existingCollaborators.map((c) => [`${c.company_id}:${c.registration}`, c]));
+  const collaboratorCache = new Map<string, CollaboratorRow>(
+    existingCollaborators.map((c) => [`${c.company_id}:${normalizeMatricula(c.registration)}`, c])
+  );
 
   for (const record of records) {
     const company = companies.find((c) => c.short_name === record.companyName);
