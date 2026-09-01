@@ -12,7 +12,7 @@ import { parseDelimitedFile } from '../utils/csvParser';
 import { confirmImport, clearImportedTimeRecords } from '../services/importsService';
 import { formatImportSummary } from '../utils/formatters';
 import { formatDateTime } from '../utils/dates';
-import { canManageMasterData } from '../lib/permissions';
+import { canManageMasterData, canImportTimeSheets } from '../lib/permissions';
 import { EmptyState } from '../components/ui/EmptyState';
 
 function detectFileType(fileName: string): ImportFileType {
@@ -32,7 +32,8 @@ export function UploadPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [lastFailedFile, setLastFailedFile] = useState<string | null>(null);
 
-  const canImport = canManageMasterData(access.context.profile?.access_type);
+  const canImport = canImportTimeSheets(access.context.profile?.access_type);
+  const canClearImported = canManageMasterData(access.context.profile?.access_type);
 
   async function handleFiles(files: File[]) {
     setProcessing(true);
@@ -115,7 +116,7 @@ export function UploadPage() {
   if (!canImport) {
     return (
       <PageContent title="Upload de Arquivos" description="Importação de cartão-ponto (CSV, TXT, PDF ou JSON).">
-        <EmptyState message="Seu perfil não possui permissão para importar dados. Solicite acesso de Administrador ou Desenvolvedor." />
+        <EmptyState message="Seu perfil não possui permissão para importar dados. Solicite acesso de Administrador, Desenvolvedor ou Facilitador." />
       </PageContent>
     );
   }
@@ -125,9 +126,11 @@ export function UploadPage() {
       title="Upload de Arquivos"
       description="Importe cartões-ponto em CSV, TXT, PDF (texto selecionável) ou uma base JSON exportada anteriormente."
       actions={
-        <Button variant="danger" onClick={() => setConfirmClear(true)}>
-          Limpar base importada
-        </Button>
+        canClearImported ? (
+          <Button variant="danger" onClick={() => setConfirmClear(true)}>
+            Limpar base importada
+          </Button>
+        ) : undefined
       }
     >
       {!preview && (

@@ -23,8 +23,8 @@ export function isAuthorizedAccessType(accessType: AccessType | null | undefined
   return (
     accessType === 'Desenvolvedor' ||
     accessType === 'Administrador' ||
-    accessType === 'Executivo' ||
     accessType === 'Gerente' ||
+    accessType === 'Executivo' ||
     accessType === 'Facilitador' ||
     accessType === 'Colaborador'
   );
@@ -54,12 +54,25 @@ export function canManageAccessProfiles(accessType: AccessType | null | undefine
 }
 
 export function canManageMasterData(accessType: AccessType | null | undefined): boolean {
-  // Colaboradores, gestores, ciclos, importações e parâmetros de Gestão BH.
+  // Exclusão de colaboradores/folgas, gestores, ciclos, limpeza de base
+  // importada e parâmetros de Gestão BH. Para cadastro/edição de
+  // colaboradores e importação de folha de ponto, ver canEditCollaborators
+  // e canImportTimeSheets (Facilitador também tem acesso a essas duas).
   return accessType === 'Desenvolvedor' || accessType === 'Administrador';
 }
 
 export function canResetDatabase(accessType: AccessType | null | undefined): boolean {
   return accessType === 'Desenvolvedor' || accessType === 'Administrador';
+}
+
+/** Cadastrar/editar colaboradores — não inclui excluir (ação destrutiva, fora do escopo do Facilitador). */
+export function canEditCollaborators(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Desenvolvedor' || accessType === 'Administrador' || accessType === 'Facilitador';
+}
+
+/** Acessar o módulo Upload de Arquivos e confirmar importação de folha de ponto (CSV/PDF/lançamento manual). */
+export function canImportTimeSheets(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Desenvolvedor' || accessType === 'Administrador' || accessType === 'Facilitador';
 }
 
 export function canViewFinancials(accessType: AccessType | null | undefined): boolean {

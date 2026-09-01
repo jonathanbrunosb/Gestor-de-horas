@@ -16,7 +16,7 @@ import { createCollaborator, deleteCollaborator, updateCollaborator, type Collab
 import { createManager, deleteManager, updateManager, countCollaboratorsByManager, type ManagerInput } from '../services/managersService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
 import { createAccessProfile, type AccessProfileInput } from '../services/accessProfilesService';
-import { canManageMasterData, canManageAccessProfiles, normalizeMatricula, accessTypeBadgeTone } from '../lib/permissions';
+import { canManageMasterData, canManageAccessProfiles, canEditCollaborators, normalizeMatricula, accessTypeBadgeTone } from '../lib/permissions';
 import { getCollaboratorStatus } from '../utils/compliance';
 import { getCompanyConfig, getCurrentCyclePeriod } from '../utils/cycles';
 import { getCollaboratorCycleBalance } from '../utils/periodBalances';
@@ -28,6 +28,7 @@ export function PeoplePage() {
   const { data, access, toast } = useAppContext();
   const navigate = useNavigate();
   const canManage = canManageMasterData(access.context.profile?.access_type);
+  const canEditCollab = canEditCollaborators(access.context.profile?.access_type);
   const canManageProfiles = canManageAccessProfiles(access.context.profile?.access_type);
 
   const [companyFilter, setCompanyFilter] = usePersistedFilter('people.company', '');
@@ -177,7 +178,7 @@ export function PeoplePage() {
           <h2 className="section-title" style={{ margin: 0 }}>
             Colaboradores ({collaboratorRows.length})
           </h2>
-          {canManage && (
+          {canEditCollab && (
             <Button
               size="small"
               onClick={() => {
@@ -257,18 +258,20 @@ export function PeoplePage() {
                         <Button size="small" variant="secondary" onClick={() => navigate(`/controle-horas?colaborador=${c.id}`)}>
                           Ver controle
                         </Button>
+                        {canEditCollab && (
+                          <Button
+                            size="small"
+                            variant="secondary"
+                            onClick={() => {
+                              setEditingCollaborator(c);
+                              setCollaboratorModalOpen(true);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                        )}
                         {canManage && (
                           <>
-                            <Button
-                              size="small"
-                              variant="secondary"
-                              onClick={() => {
-                                setEditingCollaborator(c);
-                                setCollaboratorModalOpen(true);
-                              }}
-                            >
-                              Editar
-                            </Button>
                             <Button size="small" variant="secondary" onClick={() => setLeaveModalCollaborator(c)}>
                               Folga
                             </Button>

@@ -4,7 +4,9 @@
  * armazenamento para todo saldo/duração — nunca strings "HH:MM" no banco.
  */
 
-export type AccessType = 'Desenvolvedor' | 'Administrador' | 'Executivo' | 'Gerente' | 'Facilitador' | 'Colaborador' | 'Sem acesso';
+// Ordem reflete a hierarquia real dos cargos: Gerente está acima de Executivo
+// (Executivo é restrito ao próprio time; Gerente enxerga tudo).
+export type AccessType = 'Desenvolvedor' | 'Administrador' | 'Gerente' | 'Executivo' | 'Facilitador' | 'Colaborador' | 'Sem acesso';
 export type PersonStatus = 'Ativo' | 'Inativo';
 export type ImportStatus = 'Concluído' | 'Concluído com avisos' | 'Falhou';
 export type ImportFileType = 'csv' | 'txt' | 'pdf' | 'json';
