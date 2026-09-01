@@ -6,7 +6,12 @@ import { isDeveloperMatricula } from '../../lib/permissions';
 import { Button } from '../ui/Button';
 
 interface AccessProfileFormProps {
-  initial?: AccessProfileRow | null;
+  /**
+   * Perfil existente (modo edição) ou apenas um pré-preenchimento parcial
+   * (ex.: dados vindos de um colaborador, ao criar um perfil novo a partir
+   * da Base de Colaboradores). Em ambos os casos a matrícula fica travada.
+   */
+  initial?: AccessProfileRow | Partial<AccessProfileRow> | null;
   onSubmit: (payload: AccessProfileInput) => void;
   onCancel: () => void;
   submitting: boolean;

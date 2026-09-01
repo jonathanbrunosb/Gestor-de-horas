@@ -10,11 +10,13 @@ import { StatusBadge, Badge } from '../components/ui/Badge';
 import { CollaboratorForm } from '../components/forms/CollaboratorForm';
 import { ManagerForm } from '../components/forms/ManagerForm';
 import { LeaveForm } from '../components/forms/LeaveForm';
+import { AccessProfileForm } from '../components/forms/AccessProfileForm';
 import { usePersistedFilter } from '../hooks/useFilters';
 import { createCollaborator, deleteCollaborator, updateCollaborator, type CollaboratorInput } from '../services/collaboratorsService';
 import { createManager, deleteManager, updateManager, countCollaboratorsByManager, type ManagerInput } from '../services/managersService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
-import { canManageMasterData } from '../lib/permissions';
+import { createAccessProfile, type AccessProfileInput } from '../services/accessProfilesService';
+import { canManageMasterData, canManageAccessProfiles, normalizeMatricula, accessTypeBadgeTone } from '../lib/permissions';
 import { getCollaboratorStatus } from '../utils/compliance';
 import { getCompanyConfig } from '../utils/cycles';
 import { minutesToTime } from '../utils/time';
@@ -25,6 +27,7 @@ export function PeoplePage() {
   const { data, access, toast } = useAppContext();
   const navigate = useNavigate();
   const canManage = canManageMasterData(access.context.profile?.access_type);
+  const canManageProfiles = canManageAccessProfiles(access.context.profile?.access_type);
 
   const [companyFilter, setCompanyFilter] = usePersistedFilter('people.company', '');
   const [search, setSearch] = usePersistedFilter('people.search', '');
@@ -35,12 +38,18 @@ export function PeoplePage() {
   const [editingCollaborator, setEditingCollaborator] = useState<CollaboratorRow | null>(null);
   const [deletingCollaborator, setDeletingCollaborator] = useState<CollaboratorRow | null>(null);
   const [leaveModalCollaborator, setLeaveModalCollaborator] = useState<CollaboratorRow | null>(null);
+  const [accessProfileCollaborator, setAccessProfileCollaborator] = useState<CollaboratorRow | null>(null);
 
   const [managerModalOpen, setManagerModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<ManagerRow | null>(null);
   const [deletingManager, setDeletingManager] = useState<ManagerRow | null>(null);
   const [managerLinkedCount, setManagerLinkedCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  const accessProfileByRegistration = useMemo(
+    () => new Map(data.accessProfiles.map((p) => [normalizeMatricula(p.registration), p])),
+    [data.accessProfiles]
+  );
 
   const collaboratorRows = useMemo(() => {
     return data.collaborators
@@ -135,6 +144,20 @@ export function PeoplePage() {
     }
   }
 
+  async function handleCreateAccessProfile(payload: AccessProfileInput) {
+    setSubmitting(true);
+    try {
+      await createAccessProfile(payload, access.context.matricula);
+      toast.notify(`Perfil de acesso criado para ${payload.name}.`, 'success');
+      setAccessProfileCollaborator(null);
+      data.reload();
+    } catch (error) {
+      toast.notify(error instanceof Error ? error.message : 'Falha ao criar perfil de acesso.', 'danger');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleLeaveSubmit(payload: LeaveInput) {
     try {
       await createLeave(payload, access.context.matricula);
@@ -199,6 +222,7 @@ export function PeoplePage() {
                   <th>Gestor vinculado</th>
                   <th>Saldo ciclo</th>
                   <th>Status</th>
+                  <th>Acesso</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -207,6 +231,7 @@ export function PeoplePage() {
                   const config = getCompanyConfig(data.cycles, c.company_id);
                   const status = getCollaboratorStatus(c, config, data.leaves);
                   const manager = data.managers.find((m) => m.id === c.manager_id);
+                  const accessProfile = accessProfileByRegistration.get(normalizeMatricula(c.registration));
                   return (
                     <tr key={c.id}>
                       <td>{data.companies.find((co) => co.id === c.company_id)?.short_name ?? '-'}</td>
@@ -218,6 +243,13 @@ export function PeoplePage() {
                       <td className="mono">{minutesToTime(c.cycle_balance_minutes || c.bank_hours_balance_minutes)}</td>
                       <td>
                         <StatusBadge status={status} />
+                      </td>
+                      <td>
+                        {accessProfile ? (
+                          <Badge label={accessProfile.access_type} tone={accessTypeBadgeTone(accessProfile.access_type)} />
+                        ) : (
+                          <span className="muted small-text">Sem perfil</span>
+                        )}
                       </td>
                       <td className="actions-cell">
                         <Button size="small" variant="secondary" onClick={() => navigate(`/controle-horas?colaborador=${c.id}`)}>
@@ -242,6 +274,11 @@ export function PeoplePage() {
                               Excluir
                             </Button>
                           </>
+                        )}
+                        {canManageProfiles && !accessProfile && (
+                          <Button size="small" variant="secondary" onClick={() => setAccessProfileCollaborator(c)}>
+                            Criar perfil de acesso
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -356,6 +393,30 @@ export function PeoplePage() {
 
       <Modal open={managerModalOpen} title={editingManager ? 'Editar gestor' : 'Novo gestor'} onClose={() => setManagerModalOpen(false)}>
         <ManagerForm initial={editingManager} companies={data.companies} onSubmit={handleManagerSubmit} onCancel={() => setManagerModalOpen(false)} submitting={submitting} />
+      </Modal>
+
+      <Modal
+        open={Boolean(accessProfileCollaborator)}
+        title={`Criar perfil de acesso — ${accessProfileCollaborator?.name ?? ''}`}
+        description="Dados pré-preenchidos a partir do cadastro do colaborador. A matrícula não pode ser alterada aqui."
+        onClose={() => setAccessProfileCollaborator(null)}
+      >
+        {accessProfileCollaborator && (
+          <AccessProfileForm
+            initial={{
+              name: accessProfileCollaborator.name,
+              registration: accessProfileCollaborator.registration,
+              email: accessProfileCollaborator.email,
+              title: accessProfileCollaborator.title,
+              area: accessProfileCollaborator.area,
+              access_type: 'Facilitador',
+              status: 'Ativo'
+            }}
+            onSubmit={handleCreateAccessProfile}
+            onCancel={() => setAccessProfileCollaborator(null)}
+            submitting={submitting}
+          />
+        )}
       </Modal>
 
       <Modal open={Boolean(leaveModalCollaborator)} title={`Nova folga — ${leaveModalCollaborator?.name ?? ''}`} onClose={() => setLeaveModalCollaborator(null)}>
