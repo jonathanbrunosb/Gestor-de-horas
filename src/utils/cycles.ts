@@ -45,6 +45,17 @@ export function getCurrentCyclePeriod(config: CompanyCycleRow | null, date: Date
   return { start: addMonths(sy, sm, off), end: addMonths(sy, sm, off + p - 1), months: p };
 }
 
+/**
+ * Igual a getCurrentCyclePeriod, mas ancorado numa competência (YYYY-MM)
+ * explícita em vez da data atual — o ciclo de compensação que contém
+ * `period`, mesmo que não seja o ciclo vigente "hoje". Usado para consolidar
+ * o Dashboard num mês selecionado no filtro (histórico ou não).
+ */
+export function getCyclePeriodForPeriod(config: CompanyCycleRow | null, period: string): CyclePeriod {
+  const [year, month] = period.split('-').map(Number);
+  return getCurrentCyclePeriod(config, new Date(year, (month || 1) - 1, 1));
+}
+
 export function positiveAlertMinutes(config: CompanyCycleRow | null): number {
   return config ? config.positive_alert_minutes : 600;
 }

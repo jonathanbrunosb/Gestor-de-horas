@@ -60,7 +60,7 @@ export interface CycleAlert {
 
 export interface RankingEntry {
   collaborator: CollaboratorWithRelations;
-  /** Saldo do ciclo de compensação vigente (não do mês selecionado no filtro). */
+  /** Saldo do ciclo de compensação acumulado até a competência efetiva (ver DashboardStats.effectivePeriod). */
   balanceMinutes: number;
   status: 'Regular' | 'Atenção' | 'Crítico' | 'Folga programada' | 'Inativo';
 }
@@ -78,8 +78,10 @@ export interface DashboardStats {
   totalAlerts: number;
   /** Competência (YYYY-MM) efetivamente usada nos números acima — a selecionada no filtro Mês, ou a mais recente com dados importados. */
   effectivePeriod: string | null;
-  /** Ranking de saldo do período (dia-mês, a partir dos registros de ponto importados). */
+  /** Top 8 colaboradores por saldo de ciclo acumulado até effectivePeriod (ver RankingEntry). */
   ranking: RankingEntry[];
+  /** Saldo de ciclo acumulado até effectivePeriod (mesmo cálculo do ranking) de TODOS os colaboradores ativos, não só o top 8 — usado pela coluna "Saldo ciclo" da tabela de Alertas. */
+  cycleBalanceByCollaboratorId: Map<string, number>;
 }
 
 export interface CyclePeriod {

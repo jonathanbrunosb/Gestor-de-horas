@@ -79,3 +79,19 @@ export function getCollaboratorCycleBalance(collaboratorId: string, records: Tim
     })
     .reduce((sum, r) => sum + r.balance_bh_minutes, 0);
 }
+
+/**
+ * Saldo do ciclo acumulado da competência inicial do ciclo até `uptoPeriod`
+ * (inclusive) — não conta meses do ciclo posteriores a `uptoPeriod`, mesmo
+ * que já tenham registro importado. Usado para consolidar o Dashboard num
+ * mês de filtro específico sem "vazar" saldo de competências futuras em
+ * relação ao mês selecionado.
+ */
+export function getCollaboratorCycleToDateBalance(
+  collaboratorId: string,
+  records: TimeRecordRow[],
+  cyclePeriod: CyclePeriod,
+  uptoPeriod: string
+): number {
+  return getCollaboratorCycleBalance(collaboratorId, records, { ...cyclePeriod, end: uptoPeriod });
+}

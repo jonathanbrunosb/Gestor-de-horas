@@ -11,9 +11,9 @@ import { Pagination } from '../components/ui/Pagination';
 import { LeaveForm } from '../components/forms/LeaveForm';
 import { computeDashboardStats } from '../services/dashboardService';
 import { minutesToTime } from '../utils/time';
-import { getCompanyConfig, getCurrentCyclePeriod, getCycleSequence } from '../utils/cycles';
+import { getCycleSequence } from '../utils/cycles';
 import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
-import { listSelectableMonths, getCollaboratorCycleBalance } from '../utils/periodBalances';
+import { listSelectableMonths, listAvailablePeriods, getLatestPeriod } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
@@ -53,8 +53,16 @@ export function DashboardPage() {
   const ALERTS_PAGE_SIZE = 10;
 
   const areas = useMemo(() => Array.from(new Set(data.collaborators.map((c) => c.area).filter(Boolean))).sort(), [data.collaborators]);
-  // Só janeiro até o mês atual do ano corrente — não lista meses futuros nem sem competência ainda alcançada.
-  const availablePeriods = useMemo(() => listSelectableMonths(), []);
+  // União do calendário (janeiro até o mês atual) com qualquer competência que
+  // já tenha registro importado, mesmo fora dessa janela — nunca esconde dado
+  // real e evita precisar de uma opção especial "Mais recente importado": a
+  // competência mais recente já aparece como uma seleção direta na lista.
+  const availablePeriods = useMemo(() => {
+    const combined = new Set([...listSelectableMonths(), ...listAvailablePeriods(data.records)]);
+    return Array.from(combined).sort().reverse();
+  }, [data.records]);
+  const defaultPeriod = useMemo(() => getLatestPeriod(data.records) ?? availablePeriods[0] ?? '', [data.records, availablePeriods]);
+  const effectiveMonthFilter = monthFilter || defaultPeriod;
 
   const stats = useMemo(
     () =>
@@ -66,22 +74,12 @@ export function DashboardPage() {
         records: data.records,
         leaves: data.leaves,
         areaFilter,
-        monthFilter
+        monthFilter: effectiveMonthFilter
       }),
-    [data.collaborators, data.companies, data.managers, data.cycles, data.records, data.leaves, areaFilter, monthFilter]
+    [data.collaborators, data.companies, data.managers, data.cycles, data.records, data.leaves, areaFilter, effectiveMonthFilter]
   );
 
   const periodLabel = stats.effectivePeriod ? formatPeriodLabel(stats.effectivePeriod) : 'sem dados importados';
-
-  /** Saldo do ciclo vigente por colaborador — usado nas colunas "Saldo ciclo" dos Alertas (fora do top 8 do ranking). */
-  const cycleBalanceByCollaboratorId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const c of data.collaborators) {
-      const config = getCompanyConfig(data.cycles, c.company_id);
-      map.set(c.id, getCollaboratorCycleBalance(c.id, data.records, getCurrentCyclePeriod(config)));
-    }
-    return map;
-  }, [data.collaborators, data.cycles, data.records]);
 
   const alertCounts = useMemo(() => {
     const ciclo = stats.cycleAlerts.length;
@@ -119,7 +117,7 @@ export function DashboardPage() {
     }
 
     for (const alert of stats.complianceAlerts) {
-      const cycleBalance = minutesToTime(cycleBalanceByCollaboratorId.get(alert.collaborator.id) ?? 0);
+      const cycleBalance = minutesToTime(stats.cycleBalanceByCollaboratorId.get(alert.collaborator.id) ?? 0);
       const base = {
         companyName: alert.collaborator.company?.short_name ?? '-',
         collaborator: alert.collaborator,
@@ -179,12 +177,12 @@ export function DashboardPage() {
     }
 
     return rows;
-  }, [stats.cycleAlerts, stats.complianceAlerts, cycleBalanceByCollaboratorId]);
+  }, [stats.cycleAlerts, stats.complianceAlerts, stats.cycleBalanceByCollaboratorId]);
 
   // Volta para a primeira página sempre que os filtros mudam a lista de alertas.
   useEffect(() => {
     setAlertsPage(1);
-  }, [areaFilter, monthFilter]);
+  }, [areaFilter, effectiveMonthFilter]);
 
   const alertsPageCount = Math.max(1, Math.ceil(alertRows.length / ALERTS_PAGE_SIZE));
   const alertsCurrentPage = Math.min(alertsPage, alertsPageCount);
@@ -300,8 +298,7 @@ export function DashboardPage() {
           </div>
           <div className="filter-inline">
             <label>Mês</label>
-            <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
-              <option value="">Mais recente importado{stats.effectivePeriod ? ` (${formatPeriodLabel(stats.effectivePeriod)})` : ''}</option>
+            <select value={effectiveMonthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
               {availablePeriods.map((period) => (
                 <option key={period} value={period}>
                   {formatPeriodLabel(period)}
@@ -332,17 +329,17 @@ export function DashboardPage() {
       )}
 
       <p className="small-text" style={{ marginBottom: 10 }}>
-        Saldos, créditos, débitos e ranking abaixo refletem a competência <strong>{periodLabel}</strong>
-        {areaFilter ? <> · área <strong>{areaFilter}</strong></> : null} — calculados a partir dos últimos registros de ponto importados.
+        Saldo e ranking abaixo consideram o ciclo de compensação de cada colaborador acumulado até <strong>{periodLabel}</strong>; créditos e débitos são só o movimento dessa competência
+        {areaFilter ? <> · área <strong>{areaFilter}</strong></> : null} — calculados a partir dos registros de ponto importados.
       </p>
 
       <div className="grid cards-4" style={{ marginBottom: 14 }}>
         <MetricCard title="Colaboradores monitorados" value={String(stats.total)} tone="neutral" />
-        <MetricCard title="Saldo do mês" value={minutesToTime(stats.balanceTotalMinutes)} note={periodLabel} tone="info" />
+        <MetricCard title="Saldo acumulado do ciclo" value={minutesToTime(stats.balanceTotalMinutes)} note={`até ${periodLabel}`} tone="info" />
         <MetricCard title="Créditos no mês" value={minutesToTime(stats.creditTotalMinutes)} note={periodLabel} tone="success" />
         <MetricCard title="Débitos no mês" value={minutesToTime(stats.debitTotalMinutes)} note={periodLabel} tone="warning" />
-        <MetricCard title="Saldo positivo" value={String(stats.positiveCount)} note="colaboradores" tone="success" />
-        <MetricCard title="Saldo negativo" value={String(stats.negativeCount)} note="colaboradores" tone="danger" />
+        <MetricCard title="Saldo positivo" value={String(stats.positiveCount)} note="colaboradores · saldo do ciclo" tone="success" />
+        <MetricCard title="Saldo negativo" value={String(stats.negativeCount)} note="colaboradores · saldo do ciclo" tone="danger" />
         <MetricCard title="Empresas encerrando ciclo" value={String(stats.closingCompanies.length)} tone="warning" />
         <MetricCard
           title="Alertas do período"
