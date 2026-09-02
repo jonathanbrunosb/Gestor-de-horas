@@ -7,12 +7,13 @@ import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { usePersistedFilter } from '../hooks/useFilters';
-import { minutesToTime, timeToMinutes } from '../utils/time';
+import { minutesToTime } from '../utils/time';
 import { formatDate } from '../utils/dates';
 import { deleteRecord, deleteRecordsBatch, updateRecord } from '../services/recordsService';
 import { downloadFile, toCSV } from '../utils/formatters';
-import { calcMetricsFromPunches, inferStandardMinutes, resolveDayType } from '../utils/imports';
+import { calcMetricsFromPunches, inferStandardMinutes, resolveDayType, scheduleJourneyMinutes } from '../utils/imports';
 import { canManageMasterData, isSelfServiceOnly, normalizeMatricula } from '../lib/permissions';
+import { DEFAULT_SCHEDULE_TIMES, PUNCH_TOLERANCE_MINUTES } from '../lib/constants';
 import type { TimeRecordRow } from '../types/database';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
@@ -433,19 +434,29 @@ function toPunchFields(punches: string[]): string[] {
 
 function RecordEditModal({ record, onClose, onSaved, actorRegistration }: RecordEditModalProps) {
   const [punchFields, setPunchFields] = useState<string[]>(() => toPunchFields(record.punches));
-  const [standard, setStandard] = useState(() => minutesToTime(inferStandardMinutes(record)));
+  // Dias não úteis/férias não têm horário a cumprir — tudo que for trabalhado vira crédito.
+  const [scheduleFields, setScheduleFields] = useState<string[]>(() =>
+    inferStandardMinutes(record) > 0 ? [...DEFAULT_SCHEDULE_TIMES] : ['', '', '', '']
+  );
   const [occurrence, setOccurrence] = useState(record.occurrence ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const punches = useMemo(() => punchFields.filter(Boolean), [punchFields]);
+  const scheduleTimes = useMemo(() => scheduleFields.filter(Boolean), [scheduleFields]);
 
   // Trabalhado, crédito, débito, saldo, adicional noturno e extras saem das
   // marcações — não são mais digitados à mão.
   const metrics = useMemo(
-    () => calcMetricsFromPunches(punches, timeToMinutes(standard), record.weekday ?? ''),
-    [punches, standard, record.weekday]
+    () => calcMetricsFromPunches(punches, scheduleTimes, record.weekday ?? ''),
+    [punches, scheduleTimes, record.weekday]
   );
+
+  const journeyMinutes = useMemo(() => scheduleJourneyMinutes(scheduleTimes), [scheduleTimes]);
+  const recordJourneyMinutes = inferStandardMinutes(record);
+  // Avisa quando o horário previsto informado não fecha a jornada que o próprio
+  // registro indica — sinal de que este dia segue outro horário.
+  const journeyMismatch = recordJourneyMinutes > 0 && journeyMinutes > 0 && journeyMinutes !== recordJourneyMinutes;
 
   const oddPunches = punches.length % 2 !== 0;
   const changed =
@@ -459,6 +470,10 @@ function RecordEditModal({ record, onClose, onSaved, actorRegistration }: Record
 
   function addPunchPair() {
     setPunchFields((prev) => [...prev, '', '']);
+  }
+
+  function updateScheduleField(index: number, value: string) {
+    setScheduleFields((prev) => prev.map((item, i) => (i === index ? value : item)));
   }
 
   async function handleSave() {
@@ -521,18 +536,35 @@ function RecordEditModal({ record, onClose, onSaved, actorRegistration }: Record
         </Button>
       </div>
 
-      <div className="form-row" style={{ marginTop: 14 }}>
+      <h3 className="section-title" style={{ marginTop: 18 }}>
+        Horário previsto
+      </h3>
+      <p className="small-text" style={{ marginTop: -6, marginBottom: 8 }}>
+        Base do cálculo e da tolerância do ACT: variação de até {PUNCH_TOLERANCE_MINUTES} minutos em cada marcação, para mais ou para
+        menos, não gera crédito nem débito. Deixe em branco em dias sem jornada a cumprir.
+      </p>
+      <div className="form-row">
+        {scheduleFields.map((value, idx) => (
+          <div className="field" key={idx}>
+            <label>{idx % 2 === 0 ? `Entrada ${Math.floor(idx / 2) + 1} prevista` : `Saída ${Math.floor(idx / 2) + 1} prevista`}</label>
+            <input type="time" value={value} onChange={(e) => updateScheduleField(idx, e.target.value)} />
+          </div>
+        ))}
         <div className="field">
-          {/* Duração da jornada (07:30 = sete horas e meia), não hora do dia —
-              por isso campo de texto, e não type="time". */}
           <label>Jornada prevista</label>
-          <input value={standard} onChange={(e) => setStandard(e.target.value)} placeholder="07:30" />
+          <input value={minutesToTime(journeyMinutes)} readOnly data-testid="journey-derived" />
         </div>
         <div className="field">
           <label>Ocorrência</label>
           <input value={occurrence} onChange={(e) => setOccurrence(e.target.value)} />
         </div>
       </div>
+      {journeyMismatch && (
+        <p className="small-text" style={{ marginTop: 8 }}>
+          A jornada deste horário previsto ({minutesToTime(journeyMinutes)}) difere da jornada que o registro indica (
+          {minutesToTime(recordJourneyMinutes)}). Ajuste os horários previstos se este dia segue outra escala.
+        </p>
+      )}
 
       <div className="card" style={{ marginTop: 14 }}>
         <h3 className="section-title" style={{ marginTop: 0 }}>

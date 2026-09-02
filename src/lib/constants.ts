@@ -34,3 +34,21 @@ export const FILTERS_STORAGE_KEY = 'monitor-controles-horas:filters';
 export const SIDEBAR_STORAGE_KEY = 'monitor-controles-horas:sidebar-collapsed';
 
 export const NON_WORK_SCHEDULE_CODES = ['9997', '9998', '9999'];
+
+/**
+ * Tolerância do ACT: variação de até 15 minutos em CADA marcação, em relação
+ * ao horário previsto daquela batida, não gera crédito nem débito. Ex.: com
+ * entrada prevista às 08:00, bater até 08:15 conta como 08:00; com saída
+ * prevista às 17:30, bater até 17:45 conta como 17:30. Vale igualmente para as
+ * marcações de saída e retorno do almoço, e nos dois sentidos (crédito e
+ * débito). Passando da tolerância, o horário real é considerado por inteiro —
+ * a tolerância é limite, não desconto. Valor único para todo o sistema.
+ */
+export const PUNCH_TOLERANCE_MINUTES = 15;
+
+/**
+ * Horário previsto padrão de uma jornada administrativa (código 1135 dos
+ * cartões-ponto do grupo): 08:00–12:00 e 14:00–17:30, jornada de 07:30. É só o
+ * valor inicial do formulário de edição — cada registro pode ter o seu.
+ */
+export const DEFAULT_SCHEDULE_TIMES = ['08:00', '12:00', '14:00', '17:30'];

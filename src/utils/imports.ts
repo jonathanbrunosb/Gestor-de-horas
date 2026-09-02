@@ -8,7 +8,7 @@ import type {
 } from '../types/imports';
 import { resolveCompany, extractCompanyCode } from './companies';
 import { normalizeMatricula } from '../lib/permissions';
-import { NON_WORK_SCHEDULE_CODES } from '../lib/constants';
+import { NON_WORK_SCHEDULE_CODES, PUNCH_TOLERANCE_MINUTES } from '../lib/constants';
 import { timeToMinutes } from './time';
 
 export interface PunchMetrics {
@@ -110,49 +110,113 @@ export function inferStandardMinutes(record: {
   return Math.max(0, record.worked_minutes + record.debit_bh_minutes);
 }
 
-/**
- * Recalcula as métricas do dia a partir das marcações e da jornada prevista.
- * Diferente de calcPunchMetrics (limitada a 4 marcações e a uma jornada fixa
- * só para o horário '0001'), aceita quantas marcações o dia tiver — os pares
- * entrada/saída são somados dois a dois — e recebe a jornada como parâmetro,
- * o que permite editar dias de qualquer código de horário.
- */
-export function calcMetricsFromPunches(punches: string[], standardMinutes: number, weekday: string): PunchMetrics {
-  const marks = punches.map(toMin).filter((value) => value >= 0);
+interface MinuteInterval {
+  start: number;
+  end: number;
+}
 
-  let worked = 0;
-  let night = 0;
+/** Pares entrada/saída. Saída anterior à entrada significa virada de dia (ex.: 22:00 às 02:00). */
+function toIntervals(marks: number[]): MinuteInterval[] {
+  const intervals: MinuteInterval[] = [];
   for (let i = 0; i + 1 < marks.length; i += 2) {
     const start = marks[i];
-    // Saída anterior à entrada significa virada de dia (ex.: 22:00 às 02:00).
     const end = marks[i + 1] >= start ? marks[i + 1] : marks[i + 1] + 1440;
-    worked += end - start;
-    night += calcNight(start, end);
+    if (end > start) intervals.push({ start, end });
   }
+  return intervals;
+}
 
-  if (worked <= 0) return { ...EMPTY_METRICS };
+function overlapMinutes(a: MinuteInterval, b: MinuteInterval): number {
+  return Math.max(0, Math.min(a.end, b.end) - Math.max(a.start, b.start));
+}
+
+/**
+ * Aplica a tolerância do ACT: se a marcação ficou a até `tolerance` minutos do
+ * horário previsto mais próximo, vale o horário previsto. Fora disso, vale a
+ * marcação real por inteiro.
+ */
+function snapToSchedule(mark: number, scheduledPoints: number[], tolerance: number): number {
+  let snapped = mark;
+  let smallestDiff = tolerance;
+  for (const point of scheduledPoints) {
+    const diff = Math.abs(mark - point);
+    if (diff <= smallestDiff) {
+      smallestDiff = diff;
+      snapped = point;
+    }
+  }
+  return snapped;
+}
+
+/**
+ * Recalcula as métricas do dia a partir das marcações e do horário previsto.
+ *
+ * Diferente de calcPunchMetrics (limitada a 4 marcações e a uma jornada fixa só
+ * para o horário '0001'), aceita quantas marcações o dia tiver e recebe o
+ * horário previsto como parâmetro, o que permite editar dias de qualquer
+ * código de horário.
+ *
+ * Cada marcação passa antes pela tolerância do ACT (ver
+ * PUNCH_TOLERANCE_MINUTES). Depois disso:
+ *   Trab.   = tempo trabalhado dentro da janela prevista
+ *   Deb BH  = janela prevista que não foi trabalhada
+ *   Crd BH  = tempo trabalhado fora da janela prevista
+ *   Sld BH  = crédito − débito
+ * É por isso que um mesmo dia pode ter crédito e débito ao mesmo tempo (chegou
+ * atrasado e saiu bem depois do previsto, por exemplo).
+ */
+export function calcMetricsFromPunches(
+  punches: string[],
+  scheduleTimes: string[],
+  weekday: string,
+  toleranceMinutes: number = PUNCH_TOLERANCE_MINUTES
+): PunchMetrics {
+  const scheduledPoints = scheduleTimes.map(toMin).filter((value) => value >= 0);
+  const scheduled = toIntervals(scheduledPoints);
+  const journey = scheduled.reduce((sum, item) => sum + (item.end - item.start), 0);
+
+  const marks = punches
+    .map(toMin)
+    .filter((value) => value >= 0)
+    .map((mark) => snapToSchedule(mark, scheduledPoints, Math.max(0, toleranceMinutes)));
+
+  const worked = toIntervals(marks);
+  const workedTotal = worked.reduce((sum, item) => sum + (item.end - item.start), 0);
+  const night = worked.reduce((sum, item) => sum + calcNight(item.start, item.end), 0);
+
+  if (workedTotal <= 0 && journey <= 0) return { ...EMPTY_METRICS };
 
   const isWeekend = ['SAB', 'DOM'].includes((weekday || '').toUpperCase().slice(0, 3));
   if (isWeekend) {
-    return { ...EMPTY_METRICS, workedMinutes: worked, extra100Minutes: worked, nightMinutes: night };
+    return { ...EMPTY_METRICS, workedMinutes: workedTotal, extra100Minutes: workedTotal, nightMinutes: night };
   }
 
-  const standard = Math.max(0, Math.round(standardMinutes));
-  if (standard === 0) {
+  if (journey <= 0) {
     // Sem jornada a cumprir (feriado/compensado/férias): tudo trabalhado é crédito.
-    return { ...EMPTY_METRICS, workedMinutes: worked, creditBhMinutes: worked, balanceBhMinutes: worked, nightMinutes: night };
+    return { ...EMPTY_METRICS, workedMinutes: workedTotal, creditBhMinutes: workedTotal, balanceBhMinutes: workedTotal, nightMinutes: night };
   }
 
-  const diff = worked - standard;
+  const insideSchedule = scheduled.reduce(
+    (sum, segment) => sum + worked.reduce((inner, interval) => inner + overlapMinutes(segment, interval), 0),
+    0
+  );
+  const debit = Math.max(0, journey - insideSchedule);
+  const credit = Math.max(0, workedTotal - insideSchedule);
+
   return {
-    workedMinutes: Math.min(worked, standard),
-    creditBhMinutes: diff > 0 ? diff : 0,
-    debitBhMinutes: diff < 0 ? -diff : 0,
-    balanceBhMinutes: diff,
+    workedMinutes: insideSchedule,
+    creditBhMinutes: credit,
+    debitBhMinutes: debit,
+    balanceBhMinutes: credit - debit,
     nightMinutes: night,
     extra50Minutes: 0,
     extra100Minutes: 0
   };
+}
+
+/** Jornada prevista (minutos) que resulta de um horário previsto. */
+export function scheduleJourneyMinutes(scheduleTimes: string[]): number {
+  return toIntervals(scheduleTimes.map(toMin).filter((value) => value >= 0)).reduce((sum, item) => sum + (item.end - item.start), 0);
 }
 
 export function resolveDayType(occurrence: string | undefined): DayType {
