@@ -45,52 +45,39 @@
   filter: brightness(1.08) saturate(0.9);
 }
 
+/* Recolhido, a logo do Grupo Equatorial (não mais um ícone à parte) passa a
+   representar a marca sozinha, só que reduzida — ver .sidebar.collapsed
+   .logo-image abaixo — em vez de sumir da tela. */
 .sidebar.collapsed .logo-wrap {
-  display: none;
+  padding: 16px 8px;
+}
+
+.sidebar.collapsed .logo-image {
+  width: 34px;
 }
 
 .system-block {
-  padding: 14px 16px;
+  padding: 16px 16px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  gap: 0;
   margin: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-.system-block-inner {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 11px;
-}
-
-.system-badge-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
+  text-align: center;
 }
 
 .system-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   color: #e0eef7;
-  line-height: 1.32;
-  letter-spacing: -0.015em;
-  text-align: left;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-align: center;
 }
 
+/* Recolhido, o nome por extenso não cabe — só a logo reduzida representa a
+   marca (ver .sidebar.collapsed .logo-image acima). */
 .sidebar.collapsed .system-block {
-  padding: 14px 8px;
-}
-
-.sidebar.collapsed .system-title {
   display: none;
 }
 
@@ -402,17 +389,23 @@
     transform: translateX(0);
   }
 
-  /* Aberto no celular, o menu sempre mostra ícone + texto — nunca o modo
-     "só ícone" de 72px do desktop. */
-  .sidebar.collapsed .logo-wrap,
-  .sidebar.collapsed .system-title,
+  /* Aberto no celular, o menu sempre mostra a logo por extenso, o nome do
+     sistema e o texto dos itens — nunca o modo reduzido de 72px do desktop. */
   .sidebar.collapsed .sidebar-group-label,
   .sidebar.collapsed .sidebar-item-label {
     display: revert;
   }
 
   .sidebar.collapsed .system-block {
-    padding: 14px 16px;
+    display: flex;
+  }
+
+  .sidebar.collapsed .logo-wrap {
+    padding: 22px 20px 18px;
+  }
+
+  .sidebar.collapsed .logo-image {
+    width: 138px;
   }
 
   .sidebar.collapsed .sidebar-item {

@@ -75,6 +75,11 @@ export function canImportTimeSheets(accessType: AccessType | null | undefined): 
   return accessType === 'Desenvolvedor' || accessType === 'Administrador' || accessType === 'Facilitador';
 }
 
+/** Registrar folga a partir do alerta de batida incompleta em "Alertas do período" (Dashboard). */
+export function canRegisterLeaves(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Desenvolvedor' || accessType === 'Administrador' || accessType === 'Gerente' || accessType === 'Executivo';
+}
+
 export function canViewFinancials(accessType: AccessType | null | undefined): boolean {
   return isAuthorizedAccessType(accessType) && !isSelfServiceOnly(accessType);
 }

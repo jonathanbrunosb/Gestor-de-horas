@@ -39,16 +39,7 @@ export function Sidebar({ footerText, accessType, restrictToSelfService }: Sideb
       </div>
 
       <div className="system-block">
-        <div className="system-block-inner">
-          <div className="system-badge-icon">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M2 12V4" stroke="white" strokeWidth="1.7" strokeLinecap="round" />
-              <path d="M2 12H14" stroke="white" strokeWidth="1.7" strokeLinecap="round" />
-              <path d="M5 9.5L8 6.5L10.5 9L14 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div className="system-title">{APP_NAME}</div>
-        </div>
+        <div className="system-title">{APP_NAME}</div>
       </div>
 
       <button

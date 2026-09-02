@@ -18,7 +18,7 @@ import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
 import type { BadgeTone, CollaboratorWithRelations, LeaveWithRelations } from '../types/domain';
-import { canResetDatabase, canManageMasterData } from '../lib/permissions';
+import { canResetDatabase, canRegisterLeaves } from '../lib/permissions';
 import { resetDatabase } from '../services/resetService';
 import { downloadFile } from '../utils/formatters';
 import { Button } from '../components/ui/Button';
@@ -223,7 +223,7 @@ export function DashboardPage() {
     return map;
   }, [leavesWithRelations]);
 
-  const canManageLeaves = canManageMasterData(access.context.profile?.access_type);
+  const canManageLeaves = canRegisterLeaves(access.context.profile?.access_type);
 
   async function handleExportJson() {
     const payload = {
