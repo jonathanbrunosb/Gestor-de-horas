@@ -73,6 +73,7 @@
 
   /* Layout */
   --sidebar-width: 240px;
+  --sidebar-width-collapsed: 72px;
 
   /* Typography */
   --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;

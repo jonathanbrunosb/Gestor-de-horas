@@ -48,7 +48,7 @@ function AppShell() {
   const selfServiceOnly = isSelfServiceOnly(access.context.profile?.access_type);
 
   return (
-    <AppLayout footerText={footerText} restrictToSelfService={selfServiceOnly}>
+    <AppLayout footerText={footerText} accessType={access.context.profile?.access_type} restrictToSelfService={selfServiceOnly}>
       <Routes>
         {selfServiceOnly ? (
           <>

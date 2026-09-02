@@ -352,9 +352,6 @@ textarea:disabled {
 }
 
 @media (max-width: 780px) {
-  :root {
-    --sidebar-width: 100%;
-  }
   .grid.cards-4,
   .grid.cards-3,
   .filters,
