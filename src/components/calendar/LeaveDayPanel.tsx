@@ -1,38 +1,35 @@
+import type { CollaboratorRow } from '../../types/database';
 import type { LeaveWithRelations } from '../../types/domain';
+import type { LeaveInput } from '../../services/leavesService';
 import { formatDate } from '../../utils/dates';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
+import { LeaveForm } from '../forms/LeaveForm';
 
 interface LeaveDayPanelProps {
   date: string;
   leaves: LeaveWithRelations[];
+  collaborators: CollaboratorRow[];
   canManage: boolean;
-  onAdd: () => void;
   onEdit: (leave: LeaveWithRelations) => void;
   onDelete: (leave: LeaveWithRelations) => void;
+  onCreate: (payload: LeaveInput) => void;
+  /** Muda a cada folga criada com sucesso — remonta o formulário abaixo para limpar os campos. */
+  createFormKey: number;
 }
 
-export function LeaveDayPanel({ date, leaves, canManage, onAdd, onEdit, onDelete }: LeaveDayPanelProps) {
+export function LeaveDayPanel({ date, leaves, collaborators, canManage, onEdit, onDelete, onCreate, createFormKey }: LeaveDayPanelProps) {
   return (
     <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div>
-          <h2 className="section-title" style={{ margin: 0 }}>
-            Folgas em {formatDate(date)}
-          </h2>
-          <p className="section-subtitle" style={{ margin: '2px 0 0' }}>
-            {leaves.length} folga(s) programada(s) nesta data.
-          </p>
-        </div>
-        {canManage && (
-          <Button size="small" onClick={onAdd}>
-            + Nova folga
-          </Button>
-        )}
-      </div>
+      <h2 className="section-title" style={{ margin: 0 }}>
+        Folgas do dia
+      </h2>
+      <p className="section-subtitle" style={{ margin: '2px 0 12px' }}>
+        Data selecionada: <strong>{formatDate(date)}</strong>
+      </p>
 
       {!leaves.length ? (
-        <EmptyState message="Nenhuma folga programada para esta data." />
+        <EmptyState message="Nenhuma folga programada nesta data." />
       ) : (
         <div className="list">
           {leaves.map((leave) => (
@@ -56,6 +53,15 @@ export function LeaveDayPanel({ date, leaves, canManage, onAdd, onEdit, onDelete
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {canManage && (
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
+          <h2 className="section-title" style={{ margin: '0 0 12px' }}>
+            Registrar nova folga
+          </h2>
+          <LeaveForm key={createFormKey} collaborators={collaborators} defaultDate={date} onSubmit={onCreate} submitting={false} />
         </div>
       )}
     </div>

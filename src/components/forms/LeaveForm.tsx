@@ -9,7 +9,8 @@ interface LeaveFormProps {
   collaborators: CollaboratorRow[];
   defaultDate: string;
   onSubmit: (payload: LeaveInput) => void;
-  onCancel: () => void;
+  /** Omitido quando o formulário fica embutido inline (sem nada para "cancelar") — nesse caso só o botão de salvar é exibido. */
+  onCancel?: () => void;
   submitting: boolean;
 }
 
@@ -52,7 +53,7 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
         <div className="field">
           <label>Colaborador</label>
           <select value={collaboratorId} onChange={(e) => setCollaboratorId(e.target.value)} disabled={Boolean(initial)}>
-            <option value="">Selecione</option>
+            <option value="">-- Selecione o colaborador --</option>
             {collaborators.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -94,13 +95,15 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
         </div>
         <div className="field">
           <label>Observação</label>
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <textarea rows={3} placeholder="Detalhamento opcional" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>
       <div className="modal-foot">
-        <Button variant="secondary" onClick={onCancel} disabled={submitting}>
-          Cancelar
-        </Button>
+        {onCancel && (
+          <Button variant="secondary" onClick={onCancel} disabled={submitting}>
+            Cancelar
+          </Button>
+        )}
         <Button onClick={handleSubmit} disabled={submitting}>
           {submitting ? 'Salvando…' : 'Salvar folga'}
         </Button>

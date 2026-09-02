@@ -9,7 +9,7 @@ import { LeaveForm } from '../components/forms/LeaveForm';
 import { usePersistedFilter } from '../hooks/useFilters';
 import { createLeave, deleteLeave, updateLeave, type LeaveInput } from '../services/leavesService';
 import { generateAndLogNotification } from '../services/notificationsService';
-import { toISODate } from '../utils/dates';
+import { formatMonthName, toISODate } from '../utils/dates';
 import { getCompanyConfig, isCycleClosingMonth } from '../utils/cycles';
 import { getCycleAlerts } from '../utils/compliance';
 import type { LeaveRow } from '../types/database';
@@ -21,8 +21,9 @@ export function CalendarPage() {
   const { data, access, toast } = useAppContext();
   const [companyFilter, setCompanyFilter] = usePersistedFilter('calendar.company', '');
   const [selectedDate, setSelectedDate] = useState(toISODate(new Date()));
-  const [formOpen, setFormOpen] = useState(false);
   const [editingLeave, setEditingLeave] = useState<LeaveRow | null>(null);
+  // Força o formulário inline de "Registrar nova folga" a remontar (e limpar os campos) após cada folga criada com sucesso.
+  const [createFormKey, setCreateFormKey] = useState(0);
   const [deletingLeave, setDeletingLeave] = useState<LeaveWithRelations | null>(null);
   const [notifyPrompt, setNotifyPrompt] = useState<LeaveWithRelations | null>(null);
 
@@ -87,6 +88,7 @@ export function CalendarPage() {
       if (editingLeave) {
         await updateLeave(editingLeave.id, payload, access.context.matricula);
         toast.notify('Folga atualizada.', 'success');
+        setEditingLeave(null);
       } else {
         const created = await createLeave(payload, access.context.matricula);
         toast.notify('Folga cadastrada.', 'success');
@@ -95,9 +97,8 @@ export function CalendarPage() {
         if (collaborator) {
           setNotifyPrompt({ ...created, collaborator, company: company ?? null });
         }
+        setCreateFormKey((key) => key + 1);
       }
-      setFormOpen(false);
-      setEditingLeave(null);
       data.reload();
     } catch (error) {
       toast.notify(error instanceof Error ? error.message : 'Falha ao salvar folga.', 'danger');
@@ -143,24 +144,29 @@ export function CalendarPage() {
 
   return (
     <PageContent title="Calendário de Folgas" description="Visualize e programe folgas de compensação de banco de horas por empresa.">
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div className="filters three">
-          <div className="field">
-            <label>Empresa</label>
-            <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
-              <option value="">Todas</option>
-              {data.companies.map((c) => (
-                <option key={c.id} value={c.short_name}>
-                  {c.short_name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
       <div className="grid two-col">
         <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+            <div>
+              <h2 className="section-title" style={{ margin: 0 }}>
+                {formatMonthName(new Date())}
+              </h2>
+              <p className="section-subtitle" style={{ margin: '2px 0 0' }}>
+                Clique em um dia para visualizar as folgas programadas.
+              </p>
+            </div>
+            <div className="field" style={{ minWidth: 200 }}>
+              <label>Filtrar empresa</label>
+              <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
+                <option value="">Todas</option>
+                {data.companies.map((c) => (
+                  <option key={c.id} value={c.short_name}>
+                    {c.short_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <CalendarGrid
             month={new Date()}
             leavesByDay={leavesByDay}
@@ -173,26 +179,22 @@ export function CalendarPage() {
         <LeaveDayPanel
           date={selectedDate}
           leaves={selectedLeaves}
+          collaborators={data.collaborators}
           canManage={canManage}
-          onAdd={() => {
-            setEditingLeave(null);
-            setFormOpen(true);
-          }}
-          onEdit={(leave) => {
-            setEditingLeave(leave);
-            setFormOpen(true);
-          }}
+          onEdit={(leave) => setEditingLeave(leave)}
           onDelete={(leave) => setDeletingLeave(leave)}
+          onCreate={handleSubmit}
+          createFormKey={createFormKey}
         />
       </div>
 
-      <Modal open={formOpen} title={editingLeave ? 'Editar folga' : 'Nova folga'} onClose={() => setFormOpen(false)}>
+      <Modal open={Boolean(editingLeave)} title="Editar folga" onClose={() => setEditingLeave(null)}>
         <LeaveForm
           initial={editingLeave}
           collaborators={data.collaborators}
           defaultDate={selectedDate}
           onSubmit={handleSubmit}
-          onCancel={() => setFormOpen(false)}
+          onCancel={() => setEditingLeave(null)}
           submitting={false}
         />
       </Modal>

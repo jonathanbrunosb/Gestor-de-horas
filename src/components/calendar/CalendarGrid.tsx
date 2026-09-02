@@ -57,16 +57,19 @@ export function CalendarGrid({ month, leavesByDay, criticalDays, cycleClosingDay
           const weekend = isWeekendDate(date);
           const isToday = cell.iso === todayIso;
           const critical = criticalDays.has(cell.iso);
-          const cycleClosing = cycleClosingDays.has(cell.iso) && !leaves.length;
+          // Sábado/domingo não têm expediente no nosso regime de controle —
+          // nunca contam nem colorem como folga ou encerramento de ciclo,
+          // permanecem sempre no estilo neutro "weekend" (cinza).
+          const cycleClosing = !weekend && cycleClosingDays.has(cell.iso) && !leaves.length;
           const classes = ['day'];
           if (weekend) classes.push('weekend');
           if (isToday) classes.push('today');
-          if (leaves.length) classes.push('has-leave');
+          if (!weekend && leaves.length) classes.push('has-leave');
           else if (cycleClosing) classes.push('cycle-leave');
           if (critical) classes.push('critical');
           if (cell.iso === selectedDate) classes.push('today');
 
-          const tooltip = buildTooltip({ iso: cell.iso, leaves, hasCriticalAlert: critical, isCycleClosing: cycleClosing });
+          const tooltip = weekend ? '' : buildTooltip({ iso: cell.iso, leaves, hasCriticalAlert: critical, isCycleClosing: cycleClosing });
 
           return (
             <button
@@ -78,7 +81,11 @@ export function CalendarGrid({ month, leavesByDay, criticalDays, cycleClosingDay
               style={{ textAlign: 'left' }}
             >
               <span className="day-num">{cell.day}</span>
-              {leaves.length > 0 && <span className="day-note">{leaves.length === 1 ? leaves[0].collaborator?.name ?? 'Folga' : `${leaves.length} folgas`}</span>}
+              {weekend ? (
+                <span className="day-note">Fim de semana</span>
+              ) : (
+                leaves.length > 0 && <span className="day-note">{leaves.length === 1 ? leaves[0].collaborator?.name ?? 'Folga' : `${leaves.length} folgas`}</span>
+              )}
             </button>
           );
         })}
