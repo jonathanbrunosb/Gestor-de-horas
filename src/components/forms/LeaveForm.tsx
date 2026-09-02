@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { CollaboratorRow, LeaveRow } from '../../types/database';
 import type { LeaveInput } from '../../services/leavesService';
 import { Button } from '../ui/Button';
-import { minutesToTime, timeOfDayToMinutes } from '../../utils/time';
+import { computeCompensatedMinutes, minutesToTime, timeOfDayToMinutes } from '../../utils/time';
 
 interface LeaveFormProps {
   initial?: LeaveRow | null;
@@ -21,14 +21,14 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
   const [startTime, setStartTime] = useState(initial?.start_time ?? '08:00');
   const [endTime, setEndTime] = useState(initial?.end_time ?? '17:00');
 
-  const compensatedMinutes = useMemo(() => {
+  const invalidRange = useMemo(() => {
     const start = timeOfDayToMinutes(startTime);
     const end = timeOfDayToMinutes(endTime);
-    if (start < 0 || end < 0 || end <= start) return 0;
-    return end - start;
+    return Boolean(startTime && endTime && start >= 0 && end >= 0 && end <= start);
   }, [startTime, endTime]);
 
-  const invalidRange = Boolean(startTime && endTime && compensatedMinutes === 0);
+  // Desconta o horário de almoço fixo (12:00–14:00) do intervalo — ver computeCompensatedMinutes.
+  const compensatedMinutes = useMemo(() => computeCompensatedMinutes(startTime, endTime), [startTime, endTime]);
 
   function handleSubmit() {
     const collaborator = collaborators.find((c) => c.id === collaboratorId);
@@ -79,6 +79,9 @@ export function LeaveForm({ initial, collaborators, defaultDate, onSubmit, onCan
           <input className="mono" value={minutesToTime(compensatedMinutes)} disabled />
         </div>
       </div>
+      <p className="small-text" style={{ marginTop: 6 }}>
+        O intervalo de almoço (12:00–14:00) é descontado automaticamente quando a folga o atravessa.
+      </p>
       {invalidRange && (
         <p className="small-text" style={{ color: 'var(--danger)', marginTop: 6 }}>
           Hora final deve ser depois da hora inicial para calcular as horas compensadas.

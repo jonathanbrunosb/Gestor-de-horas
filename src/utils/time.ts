@@ -74,3 +74,32 @@ export function timeOfDayToMinutes(value: string | null | undefined): number {
   const match = String(value ?? '').match(/^(\d{1,2}):(\d{2})$/);
   return match ? parseInt(match[1], 10) * 60 + parseInt(match[2], 10) : -1;
 }
+
+const LUNCH_BREAK_START_MINUTES = 12 * 60; // 12:00
+const LUNCH_BREAK_END_MINUTES = 14 * 60; // 14:00
+
+/**
+ * Minutos de sobreposição entre [startMinutes, endMinutes) e o intervalo de
+ * almoço fixo 12:00–14:00 — o quanto desse intervalo precisa ser descontado
+ * de uma folga que atravessa o horário de almoço.
+ */
+function lunchOverlapMinutes(startMinutes: number, endMinutes: number): number {
+  const overlapStart = Math.max(startMinutes, LUNCH_BREAK_START_MINUTES);
+  const overlapEnd = Math.min(endMinutes, LUNCH_BREAK_END_MINUTES);
+  return Math.max(0, overlapEnd - overlapStart);
+}
+
+/**
+ * Horas compensadas de uma folga registrada por hora inicial/final: a
+ * duração do intervalo menos o horário de almoço fixo (12:00–14:00) quando
+ * a folga o atravessa — dentro da jornada, esse intervalo não é trabalhado
+ * nem precisa ser compensado. Ex.: folga das 08:00 às 18:00 (10h corridas)
+ * compensa 08:00 (10h − 2h de almoço), não 10h. Retorna 0 para horários
+ * inválidos ou hora final não posterior à inicial.
+ */
+export function computeCompensatedMinutes(startTime: string, endTime: string): number {
+  const start = timeOfDayToMinutes(startTime);
+  const end = timeOfDayToMinutes(endTime);
+  if (start < 0 || end < 0 || end <= start) return 0;
+  return Math.max(0, end - start - lunchOverlapMinutes(start, end));
+}
