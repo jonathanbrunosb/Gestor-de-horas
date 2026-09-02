@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppContext } from '../hooks/AppDataContext';
 import { PageContent } from '../components/layout/PageContent';
@@ -11,6 +11,7 @@ import { minutesToTime, timeToMinutes } from '../utils/time';
 import { formatDate } from '../utils/dates';
 import { deleteRecord, deleteRecordsBatch, updateRecord } from '../services/recordsService';
 import { downloadFile, toCSV } from '../utils/formatters';
+import { calcMetricsFromPunches, inferStandardMinutes, resolveDayType } from '../utils/imports';
 import { canManageMasterData, isSelfServiceOnly, normalizeMatricula } from '../lib/permissions';
 import type { TimeRecordRow } from '../types/database';
 
@@ -65,6 +66,16 @@ export function DetailsPage() {
     );
   }, [records]);
 
+  // Trocar de colaborador ou de período zera a seleção: sem isso, "selecionar
+  // todos" em um mês deixaria ids de outro mês marcados e o "Excluir
+  // selecionados" apagaria registros fora da tela.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [effectiveCollaboratorId, period]);
+
+  const allSelected = records.length > 0 && records.every((r) => selectedIds.has(r.id));
+  const someSelected = records.some((r) => selectedIds.has(r.id));
+
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -72,6 +83,10 @@ export function DetailsPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (records.every((r) => prev.has(r.id)) ? new Set() : new Set(records.map((r) => r.id))));
   }
 
   async function handleDelete(id: string) {
@@ -221,10 +236,17 @@ export function DetailsPage() {
               <h2 className="section-title" style={{ margin: 0 }}>
                 Cartão-ponto do período
               </h2>
-              {canEdit && selectedIds.size > 0 && (
-                <Button size="small" variant="danger" onClick={() => setConfirmBulkDelete(true)}>
-                  Excluir selecionados ({selectedIds.size})
-                </Button>
+              {canEdit && records.length > 0 && (
+                <div className="actions-cell">
+                  <Button size="small" variant="secondary" onClick={toggleSelectAll}>
+                    {allSelected ? 'Limpar seleção' : `Selecionar todos (${records.length})`}
+                  </Button>
+                  {selectedIds.size > 0 && (
+                    <Button size="small" variant="danger" onClick={() => setConfirmBulkDelete(true)}>
+                      Excluir selecionados ({selectedIds.size})
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -235,7 +257,16 @@ export function DetailsPage() {
                 <table>
                   <thead>
                     <tr>
-                      {canEdit && <th></th>}
+                      {canEdit && (
+                        <th>
+                          <SelectAllCheckbox
+                            checked={allSelected}
+                            indeterminate={someSelected && !allSelected}
+                            onChange={toggleSelectAll}
+                            label={allSelected ? 'Limpar seleção' : 'Selecionar todos os registros do período'}
+                          />
+                        </th>
+                      )}
                       <th>Data</th>
                       <th>Sem</th>
                       <th>Hor</th>
@@ -369,6 +400,23 @@ export function DetailsPage() {
   );
 }
 
+interface SelectAllCheckboxProps {
+  checked: boolean;
+  /** Alguns (não todos) selecionados — traço no lugar do check, padrão de tabela. */
+  indeterminate: boolean;
+  onChange: () => void;
+  label: string;
+}
+
+function SelectAllCheckbox({ checked, indeterminate, onChange, label }: SelectAllCheckboxProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  // `indeterminate` só existe como propriedade do elemento, não como atributo.
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} title={label} aria-label={label} />;
+}
+
 interface RecordEditModalProps {
   record: TimeRecordRow;
   onClose: () => void;
@@ -376,59 +424,171 @@ interface RecordEditModalProps {
   actorRegistration: string | null;
 }
 
+/** Mantém um número par de campos (entrada/saída) e pelo menos um par vazio para novas marcações. */
+function toPunchFields(punches: string[]): string[] {
+  const clean = (punches ?? []).filter(Boolean);
+  const slots = Math.max(4, clean.length + (clean.length % 2 === 0 ? 2 : 1));
+  return Array.from({ length: slots }, (_, i) => clean[i] ?? '');
+}
+
 function RecordEditModal({ record, onClose, onSaved, actorRegistration }: RecordEditModalProps) {
-  const [worked, setWorked] = useState(minutesToTime(record.worked_minutes));
-  const [credit, setCredit] = useState(minutesToTime(record.credit_bh_minutes));
-  const [debit, setDebit] = useState(minutesToTime(record.debit_bh_minutes));
+  const [punchFields, setPunchFields] = useState<string[]>(() => toPunchFields(record.punches));
+  const [standard, setStandard] = useState(() => minutesToTime(inferStandardMinutes(record)));
   const [occurrence, setOccurrence] = useState(record.occurrence ?? '');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const punches = useMemo(() => punchFields.filter(Boolean), [punchFields]);
+
+  // Trabalhado, crédito, débito, saldo, adicional noturno e extras saem das
+  // marcações — não são mais digitados à mão.
+  const metrics = useMemo(
+    () => calcMetricsFromPunches(punches, timeToMinutes(standard), record.weekday ?? ''),
+    [punches, standard, record.weekday]
+  );
+
+  const oddPunches = punches.length % 2 !== 0;
+  const changed =
+    metrics.workedMinutes !== record.worked_minutes ||
+    metrics.creditBhMinutes !== record.credit_bh_minutes ||
+    metrics.debitBhMinutes !== record.debit_bh_minutes;
+
+  function updatePunch(index: number, value: string) {
+    setPunchFields((prev) => prev.map((p, i) => (i === index ? value : p)));
+  }
+
+  function addPunchPair() {
+    setPunchFields((prev) => [...prev, '', '']);
+  }
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     try {
-      const creditMin = timeToMinutes(credit);
-      const debitMin = timeToMinutes(debit);
       await updateRecord(
         record.id,
         {
-          worked_minutes: timeToMinutes(worked),
-          credit_bh_minutes: creditMin,
-          debit_bh_minutes: debitMin,
-          balance_bh_minutes: creditMin - debitMin,
-          occurrence
+          punches,
+          occurrence,
+          day_type: resolveDayType(occurrence),
+          worked_minutes: metrics.workedMinutes,
+          credit_bh_minutes: metrics.creditBhMinutes,
+          debit_bh_minutes: metrics.debitBhMinutes,
+          balance_bh_minutes: metrics.balanceBhMinutes,
+          night_minutes: metrics.nightMinutes,
+          extra_50_minutes: metrics.extra50Minutes,
+          extra_100_minutes: metrics.extra100Minutes
         },
         actorRegistration
       );
       onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar o registro.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal open title={`Editar registro de ${formatDate(record.record_date)}`} onClose={onClose} footer={
-      <>
-        <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
-        <Button onClick={handleSave} disabled={saving}>{saving ? 'Salvando…' : 'Salvar registro'}</Button>
-      </>
-    }>
+    <Modal
+      open
+      title={`Editar registro de ${formatDate(record.record_date)}`}
+      description="Informe as marcações do dia — o sistema recalcula horas trabalhadas, crédito, débito e saldo automaticamente."
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={saving || oddPunches}>
+            {saving ? 'Salvando…' : 'Salvar registro'}
+          </Button>
+        </>
+      }
+    >
       <div className="form-row">
+        {punchFields.map((value, idx) => (
+          <div className="field" key={idx}>
+            <label>{idx % 2 === 0 ? `Entrada ${Math.floor(idx / 2) + 1}` : `Saída ${Math.floor(idx / 2) + 1}`}</label>
+            <input type="time" value={value} onChange={(e) => updatePunch(idx, e.target.value)} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <Button size="small" variant="secondary" onClick={addPunchPair}>
+          Adicionar par de marcações
+        </Button>
+      </div>
+
+      <div className="form-row" style={{ marginTop: 14 }}>
         <div className="field">
-          <label>Horas trabalhadas</label>
-          <input value={worked} onChange={(e) => setWorked(e.target.value)} placeholder="00:00" />
-        </div>
-        <div className="field">
-          <label>Crédito BH</label>
-          <input value={credit} onChange={(e) => setCredit(e.target.value)} placeholder="00:00" />
-        </div>
-        <div className="field">
-          <label>Débito BH</label>
-          <input value={debit} onChange={(e) => setDebit(e.target.value)} placeholder="00:00" />
+          {/* Duração da jornada (07:30 = sete horas e meia), não hora do dia —
+              por isso campo de texto, e não type="time". */}
+          <label>Jornada prevista</label>
+          <input value={standard} onChange={(e) => setStandard(e.target.value)} placeholder="07:30" />
         </div>
         <div className="field">
           <label>Ocorrência</label>
           <input value={occurrence} onChange={(e) => setOccurrence(e.target.value)} />
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <h3 className="section-title" style={{ marginTop: 0 }}>
+          Cálculo automático
+        </h3>
+        <div className="kpi-row">
+          <div className="mini-stat">
+            <div className="mini-label">Horas trabalhadas</div>
+            <div className="mini-value" data-testid="calc-worked">
+              {minutesToTime(metrics.workedMinutes)}
+            </div>
+          </div>
+          <div className="mini-stat">
+            <div className="mini-label">Crédito BH</div>
+            <div className="mini-value" data-testid="calc-credit">
+              {minutesToTime(metrics.creditBhMinutes)}
+            </div>
+          </div>
+          <div className="mini-stat">
+            <div className="mini-label">Débito BH</div>
+            <div className="mini-value" data-testid="calc-debit">
+              {minutesToTime(metrics.debitBhMinutes)}
+            </div>
+          </div>
+          <div className="mini-stat">
+            <div className="mini-label">Saldo BH</div>
+            <div className="mini-value" data-testid="calc-balance">
+              {minutesToTime(metrics.balanceBhMinutes)}
+            </div>
+          </div>
+          <div className="mini-stat">
+            <div className="mini-label">Adicional noturno</div>
+            <div className="mini-value">{minutesToTime(metrics.nightMinutes)}</div>
+          </div>
+          <div className="mini-stat">
+            <div className="mini-label">Extras 100%</div>
+            <div className="mini-value">{minutesToTime(metrics.extra100Minutes)}</div>
+          </div>
+        </div>
+        {oddPunches && (
+          <p className="small-text" style={{ marginTop: 10 }}>
+            Há uma marcação sem par (entrada sem saída). Complete o par para salvar.
+          </p>
+        )}
+        {!oddPunches && changed && (
+          <p className="small-text" style={{ marginTop: 10 }}>
+            Os valores calculados diferem dos importados ({minutesToTime(record.worked_minutes)} trab. ·{' '}
+            {minutesToTime(record.credit_bh_minutes)} créd. · {minutesToTime(record.debit_bh_minutes)} déb.). Salvar substitui os
+            valores do registro pelos calculados acima.
+          </p>
+        )}
+        {error && (
+          <p className="small-text" style={{ marginTop: 10, color: 'var(--danger)' }}>
+            {error}
+          </p>
+        )}
       </div>
     </Modal>
   );

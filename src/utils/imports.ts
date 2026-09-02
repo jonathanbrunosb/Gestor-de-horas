@@ -8,6 +8,7 @@ import type {
 } from '../types/imports';
 import { resolveCompany, extractCompanyCode } from './companies';
 import { normalizeMatricula } from '../lib/permissions';
+import { NON_WORK_SCHEDULE_CODES } from '../lib/constants';
 import { timeToMinutes } from './time';
 
 export interface PunchMetrics {
@@ -88,6 +89,70 @@ export function calcPunchMetrics(punches: string[], scheduleCode: string, weekda
   if (nightMinutes > 0) result.nightMinutes = nightMinutes;
 
   return result;
+}
+
+/**
+ * Jornada prevista do dia, inferida do próprio registro. Nos dias normais o
+ * cartão-ponto traz "Trab." limitado à jornada e o que faltou como débito, de
+ * modo que trabalhado + débito reconstrói a jornada (ex.: 05:14 + 02:16 =
+ * 07:30; 07:30 + 00:00 = 07:30). Dias não úteis e férias não têm jornada a
+ * cumprir. Serve de referência para recalcular crédito/débito ao editar as
+ * marcações, sem depender de uma jornada fixa por código de horário.
+ */
+export function inferStandardMinutes(record: {
+  worked_minutes: number;
+  debit_bh_minutes: number;
+  day_type: DayType;
+  schedule_code: string | null;
+}): number {
+  if (record.schedule_code && NON_WORK_SCHEDULE_CODES.includes(record.schedule_code)) return 0;
+  if (record.day_type !== 'Normal') return 0;
+  return Math.max(0, record.worked_minutes + record.debit_bh_minutes);
+}
+
+/**
+ * Recalcula as métricas do dia a partir das marcações e da jornada prevista.
+ * Diferente de calcPunchMetrics (limitada a 4 marcações e a uma jornada fixa
+ * só para o horário '0001'), aceita quantas marcações o dia tiver — os pares
+ * entrada/saída são somados dois a dois — e recebe a jornada como parâmetro,
+ * o que permite editar dias de qualquer código de horário.
+ */
+export function calcMetricsFromPunches(punches: string[], standardMinutes: number, weekday: string): PunchMetrics {
+  const marks = punches.map(toMin).filter((value) => value >= 0);
+
+  let worked = 0;
+  let night = 0;
+  for (let i = 0; i + 1 < marks.length; i += 2) {
+    const start = marks[i];
+    // Saída anterior à entrada significa virada de dia (ex.: 22:00 às 02:00).
+    const end = marks[i + 1] >= start ? marks[i + 1] : marks[i + 1] + 1440;
+    worked += end - start;
+    night += calcNight(start, end);
+  }
+
+  if (worked <= 0) return { ...EMPTY_METRICS };
+
+  const isWeekend = ['SAB', 'DOM'].includes((weekday || '').toUpperCase().slice(0, 3));
+  if (isWeekend) {
+    return { ...EMPTY_METRICS, workedMinutes: worked, extra100Minutes: worked, nightMinutes: night };
+  }
+
+  const standard = Math.max(0, Math.round(standardMinutes));
+  if (standard === 0) {
+    // Sem jornada a cumprir (feriado/compensado/férias): tudo trabalhado é crédito.
+    return { ...EMPTY_METRICS, workedMinutes: worked, creditBhMinutes: worked, balanceBhMinutes: worked, nightMinutes: night };
+  }
+
+  const diff = worked - standard;
+  return {
+    workedMinutes: Math.min(worked, standard),
+    creditBhMinutes: diff > 0 ? diff : 0,
+    debitBhMinutes: diff < 0 ? -diff : 0,
+    balanceBhMinutes: diff,
+    nightMinutes: night,
+    extra50Minutes: 0,
+    extra100Minutes: 0
+  };
 }
 
 export function resolveDayType(occurrence: string | undefined): DayType {
