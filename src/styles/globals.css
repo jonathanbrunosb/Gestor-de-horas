@@ -181,10 +181,14 @@ textarea:disabled {
 }
 
 /* ══════════════════════════════════════
-   PEOPLE TABS (Base de Colaboradores)
+   TABS (Base de Colaboradores / Configurações) — .people-tab-* e
+   .settings-tab-* compartilham exatamente as mesmas regras (mesmo padrão
+   visual corporativo nas duas telas), agrupadas por seletor em vez de
+   duplicadas.
 ══════════════════════════════════════ */
 
-.people-tabs {
+.people-tabs,
+.settings-tabs {
   display: flex;
   gap: 4px;
   background: var(--surface);
@@ -196,7 +200,8 @@ textarea:disabled {
   overflow-x: auto;
 }
 
-.people-tab-button {
+.people-tab-button,
+.settings-tab-button {
   flex: 1;
   min-height: 44px;
   min-width: max-content;
@@ -215,34 +220,74 @@ textarea:disabled {
   white-space: nowrap;
 }
 
-.people-tab-button:hover {
+.people-tab-button:hover,
+.settings-tab-button:hover {
   background: var(--surface-alt);
   color: var(--text-primary);
 }
 
 .people-tab-button.active,
-.people-tab-button.active:hover {
+.people-tab-button.active:hover,
+.settings-tab-button.active,
+.settings-tab-button.active:hover {
   background: var(--navy-700);
   color: #fff;
   box-shadow: var(--shadow-xs);
 }
 
-.people-tab-button:focus-visible {
+.people-tab-button:focus-visible,
+.settings-tab-button:focus-visible {
   box-shadow: 0 0 0 3px rgba(26, 69, 104, 0.25);
 }
 
-.people-tab-panel {
+.people-tab-panel,
+.settings-tab-panel {
   min-width: 0;
 }
 
 @media (max-width: 780px) {
-  .people-tabs {
+  .people-tabs,
+  .settings-tabs {
     width: 100%;
   }
 
-  .people-tab-button {
+  .people-tab-button,
+  .settings-tab-button {
     flex: 1 1 0;
   }
+}
+
+/* ══════════════════════════════════════
+   AUDITORIA (Configurações → Auditoria)
+══════════════════════════════════════ */
+
+.audit-toolbar {
+  margin-top: 4px;
+}
+
+.audit-table td,
+.audit-table th {
+  vertical-align: top;
+}
+
+.audit-json-block {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r-sm);
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.audit-details-modal .section-title {
+  font-size: 12.5px;
 }
 
 .grid {

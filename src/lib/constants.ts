@@ -34,6 +34,8 @@ export const FILTERS_STORAGE_KEY = 'monitor-controles-horas:filters';
 export const SIDEBAR_STORAGE_KEY = 'monitor-controles-horas:sidebar-collapsed';
 /** Preferência de UI (última aba aberta em Base de Colaboradores) — nunca dado de negócio. */
 export const PEOPLE_ACTIVE_TAB_KEY = 'monitor-controles-horas:people-active-tab';
+/** Preferência de UI (última aba aberta em Configurações) — nunca dado de negócio. */
+export const SETTINGS_ACTIVE_TAB_KEY = 'monitor-controles-horas:settings-active-tab';
 
 export const NON_WORK_SCHEDULE_CODES = ['9997', '9998', '9999'];
 

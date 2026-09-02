@@ -16,7 +16,7 @@ export async function setSetting(key: string, value: unknown, actorRegistration:
   const supabase = getSupabase();
   const { error } = await supabase.from('app_settings').upsert({ setting_key: key, setting_value: value }, { onConflict: 'setting_key' });
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'update', entityType: 'app_setting', entityId: key, newValue: value });
+  await recordAuditLog({ actorRegistration, action: 'settings.update', entityType: 'app_setting', entityId: key, newValue: value });
 }
 
 export async function getGestaoConfig(): Promise<GestaoConfigValue> {

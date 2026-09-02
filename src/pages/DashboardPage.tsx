@@ -16,6 +16,7 @@ import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
 import { listSelectableMonths, listAvailablePeriods, getLatestPeriod } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
+import { createAuditLog } from '../services/auditLogService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
 import type { BadgeTone, CollaboratorWithRelations, LeaveWithRelations } from '../types/domain';
 import { canResetDatabase, canRegisterLeaves } from '../lib/permissions';
@@ -237,6 +238,13 @@ export function DashboardPage() {
       exportedAt: new Date().toISOString()
     };
     downloadFile(`monitor-controles-horas-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    void createAuditLog({
+      action: 'export.json',
+      actorRegistration: access.context.matricula,
+      entityType: 'database',
+      entityLabel: 'Backup completo (Dashboard)',
+      metadata: { collaborators: data.collaborators.length, records: data.records.length }
+    });
     toast.notify('Backup JSON exportado.', 'success');
   }
 

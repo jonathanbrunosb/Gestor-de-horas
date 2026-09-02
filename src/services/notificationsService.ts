@@ -2,6 +2,7 @@ import { getSupabase } from '../lib/supabaseClient';
 import type { NotificationLogRow } from '../types/database';
 import type { CollaboratorWithRelations } from '../types/domain';
 import { buildAlertMailto, type MailtoAlertInput } from '../utils/mailto';
+import { createAuditLog } from './auditLogService';
 
 export type NotificationLogInput = Omit<NotificationLogRow, 'id' | 'created_at'>;
 
@@ -31,6 +32,14 @@ export async function generateAndLogNotification(
     .select()
     .single();
   if (error) throw error;
+  void createAuditLog({
+    action: 'notification.mailto_generated',
+    actorRegistration,
+    entityType: 'notification',
+    entityId: data.id,
+    entityLabel: `${input.type} — ${collaborator.name}`,
+    metadata: { notificationType: input.type, toEmail: data.to_email, ccEmail: data.cc_email }
+  });
   return { mailtoUrl, log: data };
 }
 

@@ -169,12 +169,24 @@ export interface NotificationLogRow {
 
 export interface AuditLogRow {
   id: string;
+  actor_profile_id: string | null;
   actor_registration: string | null;
+  actor_name: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
   action: string;
   entity_type: string | null;
   entity_id: string | null;
+  entity_label: string | null;
+  route: string | null;
+  screen: string | null;
   old_value: unknown;
   new_value: unknown;
+  metadata: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  status: string;
+  error_message: string | null;
   created_at: string;
 }
 

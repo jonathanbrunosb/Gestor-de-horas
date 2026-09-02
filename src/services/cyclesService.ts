@@ -16,7 +16,7 @@ export async function createCycle(payload: CycleInput, actorRegistration: string
   const supabase = getSupabase();
   const { data, error } = await supabase.from('company_cycles').insert(payload).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'create', entityType: 'company_cycle', entityId: data.id, newValue: data });
+  await recordAuditLog({ actorRegistration, action: 'cycle.create', entityType: 'company_cycle', entityId: data.id, entityLabel: data.start_month, newValue: data });
   return data;
 }
 
@@ -24,15 +24,16 @@ export async function updateCycle(id: string, payload: Partial<CycleInput>, acto
   const supabase = getSupabase();
   const { data, error } = await supabase.from('company_cycles').update(payload).eq('id', id).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'update', entityType: 'company_cycle', entityId: id, newValue: payload });
+  await recordAuditLog({ actorRegistration, action: 'cycle.update', entityType: 'company_cycle', entityId: id, entityLabel: data.start_month, newValue: payload });
   return data;
 }
 
 export async function deleteCycle(id: string, actorRegistration: string | null): Promise<void> {
   const supabase = getSupabase();
+  const { data: existing } = await supabase.from('company_cycles').select('*').eq('id', id).maybeSingle();
   const { error } = await supabase.from('company_cycles').delete().eq('id', id);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'delete', entityType: 'company_cycle', entityId: id });
+  await recordAuditLog({ actorRegistration, action: 'cycle.delete', entityType: 'company_cycle', entityId: id, entityLabel: existing?.start_month, oldValue: existing });
 }
 
 /** Recria os ciclos padrão (4 meses, limites 10:00/-05:00) para empresas sem ciclo cadastrado. */
@@ -58,5 +59,5 @@ export async function restoreDefaultCycles(companies: CompanyRow[], actorRegistr
 
   const { error } = await supabase.from('company_cycles').insert(payload);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'restore_defaults', entityType: 'company_cycle', newValue: payload });
+  await recordAuditLog({ actorRegistration, action: 'cycle.restore_defaults', entityType: 'company_cycle', newValue: payload });
 }

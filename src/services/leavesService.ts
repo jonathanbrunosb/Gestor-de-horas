@@ -27,7 +27,7 @@ export async function createLeave(payload: LeaveInput, actorRegistration: string
 
   const { data, error } = await supabase.from('leaves').insert(payload).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'create', entityType: 'leave', entityId: data.id, newValue: data });
+  await recordAuditLog({ actorRegistration, action: 'leave.create', entityType: 'leave', entityId: data.id, entityLabel: data.leave_date, newValue: data });
   return data;
 }
 
@@ -35,13 +35,14 @@ export async function updateLeave(id: string, payload: Partial<LeaveInput>, acto
   const supabase = getSupabase();
   const { data, error } = await supabase.from('leaves').update(payload).eq('id', id).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'update', entityType: 'leave', entityId: id, newValue: payload });
+  await recordAuditLog({ actorRegistration, action: 'leave.update', entityType: 'leave', entityId: id, entityLabel: data.leave_date, newValue: payload });
   return data;
 }
 
 export async function deleteLeave(id: string, actorRegistration: string | null): Promise<void> {
   const supabase = getSupabase();
+  const { data: existing } = await supabase.from('leaves').select('*').eq('id', id).maybeSingle();
   const { error } = await supabase.from('leaves').delete().eq('id', id);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'delete', entityType: 'leave', entityId: id });
+  await recordAuditLog({ actorRegistration, action: 'leave.delete', entityType: 'leave', entityId: id, entityLabel: existing?.leave_date, oldValue: existing });
 }

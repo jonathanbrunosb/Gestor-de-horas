@@ -32,7 +32,7 @@ export async function createCollaborator(payload: CollaboratorInput, actorRegist
   }
   const { data, error } = await supabase.from('collaborators').insert(payload).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'create', entityType: 'collaborator', entityId: data.id, newValue: data });
+  await recordAuditLog({ actorRegistration, action: 'collaborator.create', entityType: 'collaborator', entityId: data.id, entityLabel: data.name, newValue: data });
   return data;
 }
 
@@ -40,7 +40,7 @@ export async function updateCollaborator(id: string, payload: Partial<Collaborat
   const supabase = getSupabase();
   const { data, error } = await supabase.from('collaborators').update(payload).eq('id', id).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'update', entityType: 'collaborator', entityId: id, newValue: payload });
+  await recordAuditLog({ actorRegistration, action: 'collaborator.update', entityType: 'collaborator', entityId: id, entityLabel: data.name, newValue: payload });
   return data;
 }
 
@@ -50,5 +50,5 @@ export async function deleteCollaborator(id: string, actorRegistration: string |
   const { data: existing } = await supabase.from('collaborators').select('*').eq('id', id).maybeSingle();
   const { error } = await supabase.from('collaborators').delete().eq('id', id);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'delete', entityType: 'collaborator', entityId: id, oldValue: existing });
+  await recordAuditLog({ actorRegistration, action: 'collaborator.delete', entityType: 'collaborator', entityId: id, entityLabel: existing?.name, oldValue: existing });
 }

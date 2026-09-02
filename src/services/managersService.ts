@@ -22,7 +22,7 @@ export async function createManager(payload: ManagerInput, actorRegistration: st
   const supabase = getSupabase();
   const { data, error } = await supabase.from('managers').insert(payload).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'create', entityType: 'manager', entityId: data.id, newValue: data });
+  await recordAuditLog({ actorRegistration, action: 'manager.create', entityType: 'manager', entityId: data.id, entityLabel: data.name, newValue: data });
   return data;
 }
 
@@ -30,7 +30,7 @@ export async function updateManager(id: string, payload: Partial<ManagerInput>, 
   const supabase = getSupabase();
   const { data, error } = await supabase.from('managers').update(payload).eq('id', id).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'update', entityType: 'manager', entityId: id, newValue: payload });
+  await recordAuditLog({ actorRegistration, action: 'manager.update', entityType: 'manager', entityId: id, entityLabel: data.name, newValue: payload });
   return data;
 }
 
@@ -50,7 +50,7 @@ export async function deleteManager(id: string, actorRegistration: string | null
 
   const { error } = await supabase.from('managers').delete().eq('id', id);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'delete', entityType: 'manager', entityId: id, oldValue: manager });
+  await recordAuditLog({ actorRegistration, action: 'manager.delete', entityType: 'manager', entityId: id, entityLabel: manager?.name, oldValue: manager });
 }
 
 export async function countCollaboratorsByManager(managerId: string): Promise<number> {

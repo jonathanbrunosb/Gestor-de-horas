@@ -304,6 +304,6 @@ export async function importLegacyJson(
     );
   }
 
-  await recordAuditLog({ actorRegistration, action: 'import_json', entityType: 'database', newValue: summary });
+  await recordAuditLog({ actorRegistration, action: 'import.confirm', entityType: 'database', newValue: summary });
   return summary;
 }

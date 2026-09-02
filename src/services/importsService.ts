@@ -178,7 +178,7 @@ export async function confirmImport(options: ConfirmImportOptions): Promise<Impo
     .single();
   if (importError) throw importError;
 
-  await recordAuditLog({ actorRegistration, action: 'import', entityType: 'import', entityId: importRow.id, newValue: summary });
+  await recordAuditLog({ actorRegistration, action: 'import.confirm', entityType: 'import', entityId: importRow.id, newValue: summary });
 
   return summary;
 }
@@ -187,5 +187,5 @@ export async function clearImportedTimeRecords(actorRegistration: string | null)
   const supabase = getSupabase();
   const { error } = await supabase.from('time_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'clear_imported_data', entityType: 'time_record' });
+  await recordAuditLog({ actorRegistration, action: 'import.clear_data', entityType: 'time_record' });
 }

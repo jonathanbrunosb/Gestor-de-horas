@@ -91,6 +91,17 @@ export function canRegisterLeaves(accessType: AccessType | null | undefined): bo
   );
 }
 
+/**
+ * Consultar a trilha de auditoria (tab "Auditoria" em Configurações). Restrito
+ * a Desenvolvedor/Administrador — os únicos perfis com essa exigência
+ * explícita no escopo; Gerente/Facilitador não têm regra atual que os
+ * inclua, e os logs carregam dado pessoal (IP, e-mail, matrícula de outros
+ * usuários), então o padrão conservador é não estender o acesso.
+ */
+export function canViewAuditLogs(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Desenvolvedor' || accessType === 'Administrador';
+}
+
 export function canViewFinancials(accessType: AccessType | null | undefined): boolean {
   return isAuthorizedAccessType(accessType) && !isSelfServiceOnly(accessType);
 }

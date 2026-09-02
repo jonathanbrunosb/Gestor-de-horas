@@ -45,7 +45,7 @@ export async function createRecordsBatch(records: TimeRecordInput[], actorRegist
     .select('id');
   if (error) throw error;
   const inserted = data?.length ?? 0;
-  await recordAuditLog({ actorRegistration, action: 'import_batch', entityType: 'time_record', newValue: { count: inserted } });
+  await recordAuditLog({ actorRegistration, action: 'record.create', entityType: 'time_record', newValue: { count: inserted } });
   return { inserted, duplicates: records.length - inserted };
 }
 
@@ -53,7 +53,7 @@ export async function updateRecord(id: string, payload: Partial<TimeRecordInput>
   const supabase = getSupabase();
   const { data, error } = await supabase.from('time_records').update(payload).eq('id', id).select().single();
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'update', entityType: 'time_record', entityId: id, newValue: payload });
+  await recordAuditLog({ actorRegistration, action: 'record.update', entityType: 'time_record', entityId: id, newValue: payload });
   return data;
 }
 
@@ -61,7 +61,7 @@ export async function deleteRecord(id: string, actorRegistration: string | null)
   const supabase = getSupabase();
   const { error } = await supabase.from('time_records').delete().eq('id', id);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'delete', entityType: 'time_record', entityId: id });
+  await recordAuditLog({ actorRegistration, action: 'record.delete', entityType: 'time_record', entityId: id });
 }
 
 export async function deleteRecordsBatch(ids: string[], actorRegistration: string | null): Promise<void> {
@@ -69,5 +69,5 @@ export async function deleteRecordsBatch(ids: string[], actorRegistration: strin
   const supabase = getSupabase();
   const { error } = await supabase.from('time_records').delete().in('id', ids);
   if (error) throw error;
-  await recordAuditLog({ actorRegistration, action: 'delete_batch', entityType: 'time_record', newValue: { count: ids.length } });
+  await recordAuditLog({ actorRegistration, action: 'record.bulk_delete', entityType: 'time_record', newValue: { count: ids.length } });
 }

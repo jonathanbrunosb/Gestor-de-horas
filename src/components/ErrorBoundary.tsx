@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { createAuditLog } from '../services/auditLogService';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -18,6 +19,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('Erro não tratado na aplicação:', error, info);
+    void createAuditLog({
+      action: 'system.error',
+      status: 'error',
+      entityType: 'system',
+      errorMessage: error.message || 'Erro não tratado na aplicação.',
+      metadata: { componentStack: info.componentStack ?? null }
+    });
   }
 
   render() {

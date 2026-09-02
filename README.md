@@ -177,7 +177,73 @@ Microsoft OAuth) e troque as políticas de escrita pelas versões comentadas ao
 final de `0002_create_rls_policies.sql`, que validam `auth.jwt() ->> 'email'`
 contra `access_profiles`.
 
-## 11. Como cadastrar o primeiro acesso
+## 11. Trilha de Auditoria
+
+Em **Configurações → Auditoria** (visível só para `Desenvolvedor`/
+`Administrador` — `src/lib/permissions.ts#canViewAuditLogs`), a aplicação
+mostra a tabela `audit_logs`: quem fez o quê, quando, de onde e com que
+resultado.
+
+**O que é registrado** (`src/services/auditLogService.ts`,
+`src/types/audit.ts`): acesso liberado/negado e logout; criação, edição e
+exclusão de perfis de acesso, ciclos, colaboradores, gestores, registros de
+ponto (individual e em lote) e folgas; confirmação de importação e limpeza
+de base importada; geração de e-mail de alerta (`mailto:`); alteração de
+parâmetros de Gestão BH; exportação de JSON/CSV; reset da base; e erros não
+tratados capturados pelo `ErrorBoundary`. Cada evento grava, quando
+aplicável, o valor antes e depois da alteração (`old_value`/`new_value`),
+metadados extras (`metadata`) e a tela/rota de origem — nunca senha, token
+ou chave do Supabase (`src/utils/audit.ts#sanitizeAuditValue` mascara
+automaticamente qualquer campo com esse formato antes de gravar).
+
+**Captura de IP:** o front-end publicado no GitHub Pages **nunca** tenta
+adivinhar o IP do usuário — não é possível fazer isso de forma confiável a
+partir do navegador. Por padrão (`VITE_AUDIT_EDGE_FUNCTION_URL` vazia no
+`.env` — ver `.env.example`), `createAuditLog()` grava direto na tabela,
+com `ip_address = null`, e a tela de Auditoria mostra "Não capturado" no
+lugar do IP. De propósito, o serviço **não tenta** chamar a Edge Function
+sozinho a partir só da URL do Supabase: como ela não é publicada
+automaticamente por este repositório (sem CI/CD nem Supabase CLI
+configurados aqui), fazer essa tentativa em toda ação de escrita do sistema
+pagaria uma chamada de rede fadada a falhar até alguém publicar a função de
+verdade. Para habilitar a captura real:
+
+```bash
+supabase functions deploy log-audit-event --project-ref SEU-PROJETO
+```
+
+configure, **apenas** nos Secrets da função (nunca no `.env`/GitHub Pages):
+`SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`; e defina, aí sim no `.env`
+deste front-end:
+
+```
+VITE_AUDIT_EDGE_FUNCTION_URL=https://SEU-PROJETO.supabase.co/functions/v1/log-audit-event
+```
+
+A partir daí, toda auditoria passa a tentar a Edge Function primeiro
+(timeout de 3s) e só cai para o insert direto se a chamada falhar.
+
+**Permissões:** a tela de Auditoria só é acessível a
+`Desenvolvedor`/`Administrador`; os demais perfis nem chegam a disparar a
+consulta (`AuditSettingsPanel` só busca logs quando `canView` é verdadeiro).
+Como no restante do sistema, essa restrição acontece **no front-end**, não
+no banco — a mesma limitação de MVP descrita na seção 10 se aplica aqui: as
+políticas de RLS de `audit_logs` (`0002_create_rls_policies.sql` +
+`0008_extend_audit_logs.sql`) liberam leitura para qualquer chamada
+autenticada com a chave `anon`, porque sem Supabase Auth configurado não há
+`auth.jwt()` real para checar contra `access_profiles`. **Nenhum perfil**
+consegue editar ou excluir um log pela aplicação — não existe política de
+`update`/`delete` na tabela, e RLS nega por padrão o que não tem política
+explícita. Quando Supabase Auth for habilitado, ative a política de leitura
+restrita comentada ao final de `0008_extend_audit_logs.sql`.
+
+**Limitações conhecidas do MVP:** sem a Edge Function publicada, todo IP
+aparece como "Não capturado"; sem Supabase Auth, a restrição de leitura da
+trilha depende do front-end (mesma limitação da seção 10); e eventos
+gerados antes desta funcionalidade existir (se houver) não têm os campos
+novos preenchidos (aparecem em branco na tela, sem quebrar a listagem).
+
+## 12. Como cadastrar o primeiro acesso
 
 O perfil `u1205385` (Desenvolvedor) já é criado pela migration `0003` e é
 **protegido** — não pode ser excluído nem perder o tipo de acesso
@@ -185,12 +251,12 @@ O perfil `u1205385` (Desenvolvedor) já é criado pela migration `0003` e é
 em **Configurações → Perfis de acesso**, cadastre os demais usuários
 (Administrador, Gestor, Facilitador).
 
-## 12. Como migrar a base JSON legada
+## 13. Como migrar a base JSON legada
 
-Em **Configurações → Base compartilhada**, use *Exportar backup JSON* para
-gerar um snapshot a qualquer momento.
+Em **Configurações → Ciclos → Base compartilhada (Supabase)**, use
+*Exportar backup JSON* para gerar um snapshot a qualquer momento.
 
-### 12.1 Migração completa (recomendada) — `scripts/migrate-legacy-json.mjs`
+### 13.1 Migração completa (recomendada) — `scripts/migrate-legacy-json.mjs`
 
 Para trazer um export completo do sistema antigo (`collaborators`,
 `managers`, `records`, `leaves`, `cycles`, `userProfiles`, `gestaoConfig` —
@@ -219,7 +285,7 @@ O que ele faz:
 (nome, e-mail, matrícula, saldos). Não o commite neste repositório — rode o
 script a partir de uma cópia local, fora do controle de versão.
 
-### 12.2 Importação avulsa pela interface (Upload de Arquivos)
+### 13.2 Importação avulsa pela interface (Upload de Arquivos)
 
 Para adicionar/atualizar um cartão-ponto pontual (não uma base completa),
 use a tela **Upload de Arquivos** — aceita CSV/TXT/PDF, e também um JSON no
@@ -230,7 +296,7 @@ cartão-ponto). A normalização aceita os campos legados
 também nunca duplica colaboradores/gestores nem cria gestores automaticamente
 a partir do texto do colaborador.
 
-## 13. Importação de cartão-ponto (CSV/TXT/PDF/JSON)
+## 14. Importação de cartão-ponto (CSV/TXT/PDF/JSON)
 
 - **CSV/TXT:** delimitador detectado automaticamente (`;`, `,`, tab ou `|`);
   cabeçalhos aceitam variações comuns em português (ver
@@ -246,9 +312,10 @@ Toda importação é registrada em `imports`, com a mensagem padrão
 `"Importação concluída: X registro(s), Y colaborador(es) criado(s), Z
 atualizado(s), W duplicado(s), N ignorado(s)."`.
 
-## 14. Limitações do MVP
+## 15. Limitações do MVP
 
-- Segurança de borda depende de Supabase Auth ser habilitado (ver seção 10).
+- Segurança de borda depende de Supabase Auth ser habilitado (ver seção 10);
+  a trilha de auditoria (seção 11) tem a mesma limitação.
 - Notificação por e-mail usa `mailto:` (abre o cliente de e-mail local) — não
   há envio automático via SMTP/Graph/Power Automate ainda.
 - O parser de PDF cobre o layout de cartão-ponto observado no sistema
@@ -258,14 +325,18 @@ atualizado(s), W duplicado(s), N ignorado(s)."`.
   atual (dezenas/centenas de colaboradores), mas deve ser revisto para bases
   muito maiores.
 
-## 15. Próximos passos recomendados
+## 16. Próximos passos recomendados
 
 1. Habilitar Supabase Auth (e-mail corporativo ou Microsoft OAuth) e migrar
-   as políticas de RLS para a versão restrita por `auth.jwt()`.
-2. Substituir as notificações `mailto:` por uma Supabase Edge Function ou
+   as políticas de RLS para a versão restrita por `auth.jwt()` — inclusive a
+   de leitura de `audit_logs` (seção 11).
+2. Publicar a Edge Function `log-audit-event` para captura real de IP na
+   trilha de auditoria (seção 11).
+3. Substituir as notificações `mailto:` por uma Supabase Edge Function ou
    integração com Microsoft Graph/Power Automate.
-3. Adicionar testes automatizados para as regras de horas/ciclo/compliance
+4. Adicionar testes automatizados para as regras de horas/ciclo/compliance
    (`src/utils/*.ts` são funções puras, fáceis de testar).
-4. Avaliar paginação/streaming para `time_records` conforme a base cresce.
-5. Revisar `supabase/migrations/0002_create_rls_policies.sql` junto à área de
+5. Avaliar paginação/streaming para `time_records` e `audit_logs` conforme a
+   base cresce.
+6. Revisar `supabase/migrations/0002_create_rls_policies.sql` junto à área de
    Segurança da Informação antes de armazenar dados sensíveis reais.

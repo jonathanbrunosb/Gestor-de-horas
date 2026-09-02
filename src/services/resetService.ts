@@ -44,5 +44,5 @@ export async function resetDatabase(options: ResetOptions, actorRegistration: st
     if (error) throw error;
   }
 
-  await recordAuditLog({ actorRegistration, action: 'reset_database', entityType: 'database', newValue: options });
+  await recordAuditLog({ actorRegistration, action: 'system.reset_database', entityType: 'database', newValue: options });
 }

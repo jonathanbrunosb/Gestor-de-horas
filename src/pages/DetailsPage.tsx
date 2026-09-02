@@ -13,6 +13,7 @@ import { deleteRecord, deleteRecordsBatch, updateRecord } from '../services/reco
 import { downloadFile, toCSV } from '../utils/formatters';
 import { calcMetricsFromPunches, inferStandardMinutes, resolveDayType, scheduleJourneyMinutes } from '../utils/imports';
 import { canEditTimeRecords, isSelfServiceOnly, normalizeMatricula } from '../lib/permissions';
+import { createAuditLog } from '../services/auditLogService';
 import { DEFAULT_SCHEDULE_TIMES, PUNCH_TOLERANCE_MINUTES } from '../lib/constants';
 import type { TimeRecordRow } from '../types/database';
 
@@ -131,12 +132,28 @@ export function DetailsPage() {
       Tipo: r.day_type
     }));
     downloadFile(`controle-horas-${collaborator.registration}-${period}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
+    void createAuditLog({
+      action: 'export.csv',
+      actorRegistration: access.context.matricula,
+      entityType: 'time_record',
+      entityId: collaborator.id,
+      entityLabel: `${collaborator.name} — ${period}`,
+      metadata: { rows: rows.length, period }
+    });
     toast.notify('Exportação CSV gerada.', 'success');
   }
 
   function exportJson() {
     if (!collaborator) return;
     downloadFile(`controle-horas-${collaborator.registration}-${period}.json`, JSON.stringify({ collaborator, records }, null, 2), 'application/json');
+    void createAuditLog({
+      action: 'export.json',
+      actorRegistration: access.context.matricula,
+      entityType: 'time_record',
+      entityId: collaborator.id,
+      entityLabel: `${collaborator.name} — ${period}`,
+      metadata: { records: records.length, period }
+    });
     toast.notify('Exportação JSON gerada.', 'success');
   }
 
