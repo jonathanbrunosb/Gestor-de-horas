@@ -12,7 +12,7 @@ import { formatDate } from '../utils/dates';
 import { deleteRecord, deleteRecordsBatch, updateRecord } from '../services/recordsService';
 import { downloadFile, toCSV } from '../utils/formatters';
 import { calcMetricsFromPunches, inferStandardMinutes, resolveDayType, scheduleJourneyMinutes } from '../utils/imports';
-import { canManageMasterData, isSelfServiceOnly, normalizeMatricula } from '../lib/permissions';
+import { canEditTimeRecords, isSelfServiceOnly, normalizeMatricula } from '../lib/permissions';
 import { DEFAULT_SCHEDULE_TIMES, PUNCH_TOLERANCE_MINUTES } from '../lib/constants';
 import type { TimeRecordRow } from '../types/database';
 
@@ -29,7 +29,7 @@ export function DetailsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
-  const canEdit = canManageMasterData(access.context.profile?.access_type);
+  const canEdit = canEditTimeRecords(access.context.profile?.access_type);
   const selfServiceOnly = isSelfServiceOnly(access.context.profile?.access_type);
 
   const ownCollaborator = useMemo(
