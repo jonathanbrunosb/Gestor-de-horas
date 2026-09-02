@@ -102,6 +102,8 @@ const settingsIcon: ReactNode = (
  * Facilitador entra em Base de Colaboradores e Upload de Arquivos porque já
  * tem canEditCollaborators/canImportTimeSheets nessas telas; Gerente/
  * Executivo não entram em Upload porque não têm canImportTimeSheets lá.
+ * Facilitador não entra em Gestão BH / Pagamento — módulo de exposição
+ * financeira fora do escopo operacional desse perfil.
  */
 export const MENU_GROUPS: MenuGroup[] = [
   {
@@ -116,7 +118,13 @@ export const MENU_GROUPS: MenuGroup[] = [
     items: [
       { id: 'details', label: 'Controle de Horas', route: '/controle-horas', icon: detailsIcon, allowedRoles: ALL_STAFF_ROLES },
       { id: 'calendar', label: 'Calendário de Folgas', route: '/calendario', icon: calendarIcon, allowedRoles: ALL_STAFF_ROLES },
-      { id: 'gestao', label: 'Gestão BH / Pagamento', route: '/gestao-bh', icon: managementIcon, allowedRoles: ALL_STAFF_ROLES }
+      {
+        id: 'gestao',
+        label: 'Gestão BH / Pagamento',
+        route: '/gestao-bh',
+        icon: managementIcon,
+        allowedRoles: ['Desenvolvedor', 'Administrador', 'Gerente', 'Executivo']
+      }
     ]
   },
   {
