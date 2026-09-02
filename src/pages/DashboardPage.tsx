@@ -329,15 +329,13 @@ export function DashboardPage() {
       )}
 
       <p className="small-text" style={{ marginBottom: 10 }}>
-        Saldo e ranking abaixo consideram o ciclo de compensação de cada colaborador acumulado até <strong>{periodLabel}</strong>; créditos e débitos são só o movimento dessa competência
+        Saldo e ranking abaixo consideram o ciclo de compensação de cada colaborador acumulado até <strong>{periodLabel}</strong>
         {areaFilter ? <> · área <strong>{areaFilter}</strong></> : null} — calculados a partir dos registros de ponto importados.
       </p>
 
-      <div className="grid cards-4" style={{ marginBottom: 14 }}>
+      <div className="grid cards-6" style={{ marginBottom: 14 }}>
         <MetricCard title="Colaboradores monitorados" value={String(stats.total)} tone="neutral" />
         <MetricCard title="Saldo acumulado do ciclo" value={minutesToTime(stats.balanceTotalMinutes)} note={`até ${periodLabel}`} tone="info" />
-        <MetricCard title="Créditos no mês" value={minutesToTime(stats.creditTotalMinutes)} note={periodLabel} tone="success" />
-        <MetricCard title="Débitos no mês" value={minutesToTime(stats.debitTotalMinutes)} note={periodLabel} tone="warning" />
         <MetricCard title="Saldo positivo" value={String(stats.positiveCount)} note="colaboradores · saldo do ciclo" tone="success" />
         <MetricCard title="Saldo negativo" value={String(stats.negativeCount)} note="colaboradores · saldo do ciclo" tone="danger" />
         <MetricCard title="Empresas encerrando ciclo" value={String(stats.closingCompanies.length)} note={`em ${periodLabel}`} tone="warning" />

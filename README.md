@@ -1,4 +1,4 @@
-# Monitor de Controles de Horas — Equatorial
+# Gestor de Horas — Equatorial
 
 Sistema interno da área de Contabilidade IV / Gerência de Contabilidade para
 acompanhamento de banco de horas, folgas, fechamento de ciclos, alertas
@@ -10,8 +10,8 @@ base oficial de dados e deploy do front-end via **GitHub Pages**.
 
 ## 1. Visão geral
 
-- **Nome oficial:** Monitor de Controles de Horas
-- **Título:** Monitor · Controles de Horas — Equatorial
+- **Nome oficial:** Gestor de Horas
+- **Título:** Gestor de Horas — Equatorial
 - **Módulos:** Dashboard, Resumo por Colaborador, Controle de Horas,
   Calendário de Folgas, Upload de Arquivos, Gestão BH / Pagamento,
   Configurações, Base de Colaboradores.
@@ -84,7 +84,7 @@ Preencha:
 ```env
 VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
-VITE_APP_NAME=Monitor de Controles de Horas
+VITE_APP_NAME=Gestor de Horas
 ```
 `.env` nunca é commitado (`.gitignore`). A chave `anon` é pública por design
 do Supabase — a proteção real de dados vem do RLS (seção 9 abaixo).

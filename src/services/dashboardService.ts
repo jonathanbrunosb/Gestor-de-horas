@@ -9,25 +9,24 @@ import {
   getCycleSequenceForPeriod,
   isCycleClosingPeriod
 } from '../utils/cycles';
-import { getCollaboratorCycleToDateBalance, getCollaboratorPeriodBalance, getLatestPeriod } from '../utils/periodBalances';
+import { getCollaboratorCycleToDateBalance, getLatestPeriod } from '../utils/periodBalances';
 
 /**
  * Composição pura de estatísticas do Dashboard a partir dos dados já
  * carregados em memória (via useAppData) — não faz chamadas de rede.
  *
- * Créditos/débitos são o movimento da competência efetiva (a selecionada no
- * filtro Mês, ou a mais recente com dados importados) isoladamente. Saldo,
- * ranking e as contagens positivo/negativo, por sua vez, são o saldo do
- * ciclo de compensação ACUMULADO desde o início do ciclo que contém a
- * competência efetiva até ela (nunca só o mês isolado) — é assim que banco
- * de horas funciona (o saldo carrega de um mês para o outro dentro do
- * ciclo), e é o mesmo cálculo usado no Ranking/Status/coluna "Saldo ciclo"
- * dos Alertas, para os números da consolidação baterem entre si em vez de
- * cada bloco do Dashboard mostrar um recorte diferente. Tudo a partir dos
- * registros de ponto (time_records) — nunca das colunas estáticas de saldo
- * do cadastro do colaborador, que só são atualizadas por importação de
- * backup e ficam desatualizadas assim que uma nova competência é importada
- * via upload de folha de ponto.
+ * Saldo, ranking e as contagens positivo/negativo são o saldo do ciclo de
+ * compensação ACUMULADO desde o início do ciclo que contém a competência
+ * efetiva (a selecionada no filtro Mês, ou a mais recente com dados
+ * importados) até ela — é assim que banco de horas funciona (o saldo
+ * carrega de um mês para o outro dentro do ciclo), e é o mesmo cálculo
+ * usado no Ranking/Status/coluna "Saldo ciclo" dos Alertas, para os números
+ * da consolidação baterem entre si em vez de cada bloco do Dashboard
+ * mostrar um recorte diferente. Tudo a partir dos registros de ponto
+ * (time_records) — nunca das colunas estáticas de saldo do cadastro do
+ * colaborador, que só são atualizadas por importação de backup e ficam
+ * desatualizadas assim que uma nova competência é importada via upload de
+ * folha de ponto.
  *
  * TODA análise de ciclo daqui — janela do ciclo, mês de encerramento,
  * alertas e status — é ancorada na competência efetiva (CycleReference), e
@@ -88,10 +87,6 @@ export function computeDashboardStats(options: {
   const cycleAlerts = getCycleAlerts(active, cycles, leaves, records, reference);
   const complianceAlerts = getComplianceAlerts(active, records, leaves, reference);
 
-  const periodBalances = effectivePeriod
-    ? active.map((c) => ({ collaborator: c, ...getCollaboratorPeriodBalance(c.id, records, effectivePeriod) }))
-    : [];
-
   // Snapshot único de saldo/status do ciclo acumulado até a competência
   // analisada, por colaborador ativo — alimenta o ranking (top 8), as
   // contagens positivo/negativo, o saldo total consolidado e a coluna
@@ -110,8 +105,6 @@ export function computeDashboardStats(options: {
   return {
     total: active.length,
     balanceTotalMinutes: cycleSnapshots.reduce((sum, s) => sum + s.balanceMinutes, 0),
-    creditTotalMinutes: periodBalances.reduce((sum, p) => sum + p.creditMinutes, 0),
-    debitTotalMinutes: periodBalances.reduce((sum, p) => sum + p.debitMinutes, 0),
     positiveCount: cycleSnapshots.filter((s) => s.balanceMinutes > 0).length,
     negativeCount: cycleSnapshots.filter((s) => s.balanceMinutes < 0).length,
     closingCompanies,

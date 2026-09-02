@@ -22,7 +22,7 @@ export async function generateAndLogNotification(
       notification_type: input.type,
       to_email: collaborator.email,
       cc_email: collaborator.manager?.email ?? collaborator.manager_email,
-      subject: `[Monitor de Horas] ${input.type} — ${collaborator.name}`,
+      subject: `[Gestor de Horas] ${input.type} — ${collaborator.name}`,
       body: input.details,
       mailto_url: mailtoUrl,
       status: 'Gerado',

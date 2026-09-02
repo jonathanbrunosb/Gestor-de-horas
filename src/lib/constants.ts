@@ -1,5 +1,5 @@
-export const APP_NAME = 'Monitor de Controles de Horas';
-export const APP_TITLE = 'Monitor · Controles de Horas — Equatorial';
+export const APP_NAME = 'Gestor de Horas';
+export const APP_TITLE = 'Gestor de Horas — Equatorial';
 
 export const COMPANIES = ['EQTL AL', 'EQTL PA', 'EQTL PI', 'EQTL MA', 'EQTL CEEE', 'EQTL CEA', 'EQTL GO', 'CSA'] as const;
 

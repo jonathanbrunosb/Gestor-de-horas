@@ -68,8 +68,6 @@ export interface RankingEntry {
 export interface DashboardStats {
   total: number;
   balanceTotalMinutes: number;
-  creditTotalMinutes: number;
-  debitTotalMinutes: number;
   positiveCount: number;
   negativeCount: number;
   /** Empresas cujo ciclo encerra NA COMPETÊNCIA ANALISADA (não em "hoje"). */

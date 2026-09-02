@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Monitor de Controles de Horas — Equatorial. Monitoramento de banco de horas, ciclos de compensação, folgas e alertas trabalhistas.",
+  "description": "Gestor de Horas — Equatorial. Monitoramento de banco de horas, ciclos de compensação, folgas e alertas trabalhistas.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

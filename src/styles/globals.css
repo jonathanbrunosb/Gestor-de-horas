@@ -192,6 +192,10 @@ textarea:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.grid.cards-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .grid.two-col {
   grid-template-columns: minmax(0, 1.5fr) minmax(290px, 0.5fr);
   align-items: start;
@@ -333,6 +337,9 @@ textarea:disabled {
   .grid.cards-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .grid.cards-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .grid.two-col {
     grid-template-columns: 1fr;
   }
@@ -355,5 +362,8 @@ textarea:disabled {
   .filters.three,
   .form-row {
     grid-template-columns: 1fr;
+  }
+  .grid.cards-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

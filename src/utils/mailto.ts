@@ -18,10 +18,10 @@ export interface MailtoAlertInput {
 /** Monta o link mailto: (assunto/corpo padrão da seção 23 do escopo). */
 export function buildAlertMailto({ collaborator, type, details, action }: MailtoAlertInput): string {
   const companyName = collaborator.company?.short_name ?? '-';
-  const subject = `[Monitor de Horas] ${type} — ${collaborator.name}`;
+  const subject = `[Gestor de Horas] ${type} — ${collaborator.name}`;
   const body = `Prezado(a) ${collaborator.name},
 
-O Monitor de Controles de Horas da Gerência de Contabilidade identificou a seguinte ocorrência em seu registro de ponto:
+O Gestor de Horas da Gerência de Contabilidade identificou a seguinte ocorrência em seu registro de ponto:
 
 Tipo: ${type}
 Empresa: ${companyName}
@@ -33,7 +33,7 @@ Por favor, tome as providências necessárias ou entre em contato com seu gestor
 
 Atenciosamente,
 Gerência de Contabilidade — Equatorial Energia
-Monitor de Controles de Horas`;
+Gestor de Horas`;
 
   const to = collaborator.email || '';
   const cc = collaborator.manager?.email || collaborator.manager_email || '';
