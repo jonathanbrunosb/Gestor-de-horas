@@ -91,7 +91,12 @@ textarea:disabled {
 .form-row {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  /* auto-fit em vez de repeat(4, ...) fixo: quando a linha tem menos de 4
+     campos (ex.: só Colaborador+Data, ou Motivo+Observação), as colunas
+     vazias colapsam e os campos existentes se redistribuem para ocupar a
+     largura disponível, em vez de ficar cada um preso a 1/4 da linha com
+     metade dela em branco. */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
 .filters {
@@ -199,6 +204,17 @@ textarea:disabled {
 .grid.two-col {
   grid-template-columns: minmax(0, 1.5fr) minmax(290px, 0.5fr);
   align-items: start;
+}
+
+/* Calendário de Folgas: os dois cards (calendário + Folgas do dia) esticam
+   para a mesma altura (sem align-items:start) e a coluna direita ganha uma
+   proporção menos apertada — o suficiente para os campos em dupla (Colabo-
+   rador/Data, Motivo/Observação) do formulário embutido não ficarem espre-
+   midos. Classe própria em vez de mudar .two-col: essa é compartilhada com
+   o Dashboard, cujo layout (colunas com cards empilhados, não um único card
+   por coluna) não pede o mesmo ajuste. */
+.grid.calendar-split {
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
 }
 
 .list {
@@ -340,7 +356,8 @@ textarea:disabled {
   .grid.cards-6 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .grid.two-col {
+  .grid.two-col,
+  .grid.calendar-split {
     grid-template-columns: 1fr;
   }
   .filters,

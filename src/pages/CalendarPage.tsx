@@ -144,7 +144,7 @@ export function CalendarPage() {
 
   return (
     <PageContent title="Calendário de Folgas" description="Visualize e programe folgas de compensação de banco de horas por empresa.">
-      <div className="grid two-col">
+      <div className="grid calendar-split">
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
             <div>
