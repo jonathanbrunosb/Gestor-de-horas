@@ -72,7 +72,10 @@ export interface DashboardStats {
   debitTotalMinutes: number;
   positiveCount: number;
   negativeCount: number;
+  /** Empresas cujo ciclo encerra NA COMPETÊNCIA ANALISADA (não em "hoje"). */
   closingCompanies: CompanyCycleWithCompany[];
+  /** Situação do ciclo, na competência analisada, de cada empresa com colaborador ativo em tela. */
+  cycleSummaries: CycleSummary[];
   cycleAlerts: CycleAlert[];
   complianceAlerts: ComplianceAlert[];
   totalAlerts: number;
@@ -88,6 +91,38 @@ export interface CyclePeriod {
   start: string; // YYYY-MM
   end: string; // YYYY-MM
   months?: number;
+}
+
+/**
+ * Âncora temporal de uma análise de ciclo. Existe porque "mês de
+ * encerramento", "janela do ciclo" e "há folga programada à frente?" são
+ * perguntas diferentes: as duas primeiras dependem da COMPETÊNCIA analisada
+ * (o mês do filtro), a última depende de um instante no tempo. Sem essa
+ * separação, filtrar um mês passado continuava respondendo tudo em relação
+ * a "hoje".
+ */
+export interface CycleReference {
+  /** Competência (YYYY-MM) analisada — ancora a janela do ciclo e a checagem de mês de encerramento. */
+  period: string;
+  /** "Agora" limitado ao fim da competência analisada (ver referenceDateForPeriod). */
+  date: Date;
+  /** true quando a competência analisada é a corrente ou posterior — só nesse caso um lembrete D-1 de folga é acionável. */
+  isPresent: boolean;
+}
+
+/** Resumo do ciclo de compensação de uma empresa na competência analisada — usado no card "Ciclos por empresa". */
+export interface CycleSummary {
+  cycle: CompanyCycleRow | null;
+  company: CompanyRow | null;
+  /** Janela [start,end] do ciclo que contém a competência analisada. */
+  period: CyclePeriod;
+  /** Posição da competência dentro do ciclo, ex.: "4/4". */
+  sequence: string;
+  /** A competência analisada é o mês de encerramento desse ciclo. */
+  isClosing: boolean;
+  /** A empresa não tem ciclo ativo cadastrado — o sistema cai numa janela móvel de 4 meses que nunca encerra nem zera o saldo. */
+  missingConfig: boolean;
+  collaboratorCount: number;
 }
 
 export interface GestaoCollaboratorRow extends CollaboratorWithRelations {

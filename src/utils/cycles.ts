@@ -1,6 +1,12 @@
 import type { CompanyCycleRow } from '../types/database';
-import type { CyclePeriod } from '../types/domain';
-import { addMonths } from './dates';
+import type { CycleReference, CyclePeriod } from '../types/domain';
+import { addMonths, monthKey } from './dates';
+
+/** Primeiro dia da competência (YYYY-MM) como Date — âncora das funções de ciclo por competência. */
+export function periodToDate(period: string): Date {
+  const [year, month] = period.split('-').map(Number);
+  return new Date(year || 1970, (month || 1) - 1, 1);
+}
 
 /** Config de ciclo da empresa (ou null se não houver ciclo cadastrado). */
 export function getCompanyConfig(cycles: CompanyCycleRow[], companyId: string | null): CompanyCycleRow | null {
@@ -52,8 +58,52 @@ export function getCurrentCyclePeriod(config: CompanyCycleRow | null, date: Date
  * o Dashboard num mês selecionado no filtro (histórico ou não).
  */
 export function getCyclePeriodForPeriod(config: CompanyCycleRow | null, period: string): CyclePeriod {
+  return getCurrentCyclePeriod(config, periodToDate(period));
+}
+
+/** Igual a isCycleClosingMonth, mas ancorado numa competência (YYYY-MM) em vez da data atual. */
+export function isCycleClosingPeriod(config: CompanyCycleRow | null, period: string): boolean {
+  return isCycleClosingMonth(config, periodToDate(period));
+}
+
+/** Igual a getCycleSequence, mas ancorado numa competência (YYYY-MM) em vez da data atual. */
+export function getCycleSequenceForPeriod(config: CompanyCycleRow | null, period: string): string {
+  return getCycleSequence(config, periodToDate(period));
+}
+
+/**
+ * Data de referência para as checagens que dependem de "quando estamos"
+ * (ex.: existe folga programada à frente?) ao analisar uma competência: é o
+ * agora, limitado ao fim do mês analisado. Para um mês já passado, o último
+ * dia dele — a pergunta passa a ser "naquele fechamento havia folga
+ * programada?" em vez de "há folga programada hoje?"; para o mês corrente
+ * (ou uma competência à frente do calendário), continua sendo hoje, ou seja,
+ * o comportamento atual da tela não muda na visão padrão.
+ */
+export function referenceDateForPeriod(period: string, today: Date = new Date()): Date {
   const [year, month] = period.split('-').map(Number);
-  return getCurrentCyclePeriod(config, new Date(year, (month || 1) - 1, 1));
+  if (!year || !month) return today;
+  const lastDayOfPeriod = new Date(year, month, 0);
+  return lastDayOfPeriod < today ? lastDayOfPeriod : today;
+}
+
+/** Competência (YYYY-MM) do mês corrente — competência padrão quando não há filtro nem dado importado. */
+export function currentPeriod(today: Date = new Date()): string {
+  return monthKey(today);
+}
+
+/**
+ * Monta a âncora temporal usada por toda análise de ciclo de uma
+ * competência (ver CycleReference). Passar essa referência adiante é o que
+ * faz o Dashboard responder ao filtro Mês em vez de responder sempre em
+ * relação a "hoje".
+ */
+export function buildCycleReference(period: string, today: Date = new Date()): CycleReference {
+  return {
+    period,
+    date: referenceDateForPeriod(period, today),
+    isPresent: period >= monthKey(today)
+  };
 }
 
 export function positiveAlertMinutes(config: CompanyCycleRow | null): number {

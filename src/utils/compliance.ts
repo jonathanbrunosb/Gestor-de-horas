@@ -1,10 +1,17 @@
 import type { CollaboratorRow, CompanyCycleRow, LeaveRow, TimeRecordRow } from '../types/database';
-import type { CollaboratorWithRelations, ComplianceAlert, CycleAlert } from '../types/domain';
+import type { CollaboratorWithRelations, ComplianceAlert, CycleAlert, CycleReference } from '../types/domain';
 import { NON_WORK_SCHEDULE_CODES } from '../lib/constants';
 import { formatDate, toISODate } from './dates';
 import { timeOfDayToMinutes } from './time';
-import { getCompanyConfig, getCurrentCyclePeriod, isCycleClosingMonth, positiveAlertMinutes } from './cycles';
-import { getCollaboratorCycleBalance } from './periodBalances';
+import {
+  getCompanyConfig,
+  getCurrentCyclePeriod,
+  getCyclePeriodForPeriod,
+  isCycleClosingMonth,
+  isCycleClosingPeriod,
+  positiveAlertMinutes
+} from './cycles';
+import { getCollaboratorCycleBalance, getCollaboratorCycleToDateBalance } from './periodBalances';
 
 /** Um registro conta como dia útil "de trabalho" (exclui feriado/DSR/compensado/férias). */
 export function isWorkingRecord(record: TimeRecordRow): boolean {
@@ -28,20 +35,28 @@ function getMostRecentPeriod(collaboratorId: string, records: TimeRecordRow[]): 
 
 /**
  * Gera alertas de compliance (interjornada CLT Art.66, intrajornada CLT Art.71,
- * batida incompleta e lembrete D-1 de folga) — porta fiel de getComplianceAlerts().
+ * batida incompleta e lembrete D-1 de folga).
+ *
+ * Com `reference`, a análise é feita na competência informada (o mês do
+ * filtro) para todos os colaboradores — sem ela, cada colaborador é
+ * analisado na sua própria competência mais recente, que é o comportamento
+ * das telas sem filtro de mês. O lembrete D-1 de folga só é emitido quando a
+ * competência analisada é a corrente (ou posterior): olhando um mês passado,
+ * "folga amanhã" não é acionável.
  */
 export function getComplianceAlerts(
   collaborators: CollaboratorWithRelations[],
   records: TimeRecordRow[],
   leaves: LeaveRow[],
-  today: Date = new Date()
+  reference?: CycleReference
 ): ComplianceAlert[] {
   const alerts: ComplianceAlert[] = [];
+  const today = reference?.date ?? new Date();
 
   for (const collaborator of collaborators) {
     if (collaborator.status !== 'Ativo') continue;
 
-    const period = getMostRecentPeriod(collaborator.id, records);
+    const period = reference?.period ?? getMostRecentPeriod(collaborator.id, records);
     if (!period) continue;
 
     const allRecs = records
@@ -146,7 +161,9 @@ export function getComplianceAlerts(
     }
   }
 
-  // Lembrete D-1: folgas agendadas para amanhã
+  // Lembrete D-1: folgas agendadas para amanhã — só faz sentido no presente.
+  if (reference && !reference.isPresent) return alerts.sort((a, b) => b.count - a.count);
+
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowIso = toISODate(tomorrow);
@@ -171,44 +188,59 @@ export function getComplianceAlerts(
 
 /**
  * Alertas de encerramento de ciclo com saldo positivo acima do limite. O
- * saldo é somado a partir dos registros de ponto do ciclo vigente (nunca da
- * coluna estática cycle_balance_minutes do cadastro, que só é atualizada por
+ * saldo é somado a partir dos registros de ponto do ciclo (nunca da coluna
+ * estática cycle_balance_minutes do cadastro, que só é atualizada por
  * importação de backup e fica desatualizada assim que uma nova competência é
  * importada via upload de folha de ponto).
+ *
+ * Com `reference` (competência analisada), tanto a janela do ciclo quanto a
+ * checagem de "é o mês de encerramento?" passam a ser dessa competência —
+ * é o que faz o Dashboard responder ao filtro Mês. Sem ela, mantém o
+ * comportamento ancorado em hoje (usado pelas telas sem filtro de mês).
  */
 export function getCycleAlerts(
   collaborators: CollaboratorWithRelations[],
   cycles: CompanyCycleRow[],
   leaves: LeaveRow[],
-  records: TimeRecordRow[]
+  records: TimeRecordRow[],
+  reference?: CycleReference
 ): CycleAlert[] {
   return collaborators
     .filter((c) => c.status === 'Ativo')
     .map((c): CycleAlert => {
       const config = getCompanyConfig(cycles, c.company_id);
-      const cyclePeriod = getCurrentCyclePeriod(config);
-      const balanceMinutes = getCollaboratorCycleBalance(c.id, records, cyclePeriod);
+      const cyclePeriod = reference ? getCyclePeriodForPeriod(config, reference.period) : getCurrentCyclePeriod(config);
+      const balanceMinutes = reference
+        ? getCollaboratorCycleToDateBalance(c.id, records, cyclePeriod, reference.period)
+        : getCollaboratorCycleBalance(c.id, records, cyclePeriod);
       const limitMinutes = positiveAlertMinutes(config);
-      const closing = isCycleClosingMonth(config);
-      const futureLeave = hasFutureLeave(c.id, leaves);
+      const closing = reference ? isCycleClosingPeriod(config, reference.period) : isCycleClosingMonth(config);
+      const futureLeave = hasFutureLeave(c.id, leaves, reference?.date);
       return { collaborator: c, config, balanceMinutes, limitMinutes, closing, hasFutureLeave: futureLeave };
     })
     .filter((item) => item.closing && item.balanceMinutes > item.limitMinutes)
     .sort((a, b) => b.balanceMinutes - a.balanceMinutes);
 }
 
-/** Status calculado de um colaborador a partir do saldo do ciclo vigente (ver getCollaboratorCycleBalance) — usado em tabelas e badges. */
+/**
+ * Status calculado de um colaborador a partir do saldo do ciclo (ver
+ * getCollaboratorCycleBalance) — usado em tabelas e badges. Com `reference`,
+ * "Crítico" (encerramento com saldo acima do limite) e "Folga programada"
+ * são avaliados na competência analisada em vez de sempre em hoje.
+ */
 export function getCollaboratorStatus(
   collaborator: CollaboratorRow,
   balanceMinutes: number,
   config: CompanyCycleRow | null,
-  leaves: LeaveRow[]
+  leaves: LeaveRow[],
+  reference?: CycleReference
 ): 'Regular' | 'Atenção' | 'Crítico' | 'Folga programada' | 'Inativo' {
   if (!collaborator || collaborator.status !== 'Ativo') return 'Inativo';
   const positiveLimit = positiveAlertMinutes(config);
   const negativeLimit = config ? config.negative_alert_minutes : -300;
-  if (isCycleClosingMonth(config) && balanceMinutes > positiveLimit) return 'Crítico';
-  if (hasFutureLeave(collaborator.id, leaves)) return 'Folga programada';
+  const closing = reference ? isCycleClosingPeriod(config, reference.period) : isCycleClosingMonth(config);
+  if (closing && balanceMinutes > positiveLimit) return 'Crítico';
+  if (hasFutureLeave(collaborator.id, leaves, reference?.date)) return 'Folga programada';
   if (balanceMinutes > positiveLimit || balanceMinutes < negativeLimit) return 'Atenção';
   return 'Regular';
 }

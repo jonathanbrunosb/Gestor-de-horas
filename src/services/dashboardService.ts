@@ -1,8 +1,15 @@
 import type { CollaboratorRow, CompanyCycleRow, CompanyRow, LeaveRow, ManagerRow, TimeRecordRow } from '../types/database';
-import type { CollaboratorWithRelations, CompanyCycleWithCompany, DashboardStats, RankingEntry } from '../types/domain';
+import type { CollaboratorWithRelations, CompanyCycleWithCompany, CycleSummary, DashboardStats, RankingEntry } from '../types/domain';
 import { getComplianceAlerts, getCollaboratorStatus, getCycleAlerts } from '../utils/compliance';
-import { getCompanyConfig, getCurrentCyclePeriod, getCyclePeriodForPeriod, isCycleClosingMonth } from '../utils/cycles';
-import { getCollaboratorCycleBalance, getCollaboratorCycleToDateBalance, getCollaboratorPeriodBalance, getLatestPeriod } from '../utils/periodBalances';
+import {
+  buildCycleReference,
+  currentPeriod,
+  getCompanyConfig,
+  getCyclePeriodForPeriod,
+  getCycleSequenceForPeriod,
+  isCycleClosingPeriod
+} from '../utils/cycles';
+import { getCollaboratorCycleToDateBalance, getCollaboratorPeriodBalance, getLatestPeriod } from '../utils/periodBalances';
 
 /**
  * Composição pura de estatísticas do Dashboard a partir dos dados já
@@ -21,6 +28,12 @@ import { getCollaboratorCycleBalance, getCollaboratorCycleToDateBalance, getColl
  * do cadastro do colaborador, que só são atualizadas por importação de
  * backup e ficam desatualizadas assim que uma nova competência é importada
  * via upload de folha de ponto.
+ *
+ * TODA análise de ciclo daqui — janela do ciclo, mês de encerramento,
+ * alertas e status — é ancorada na competência efetiva (CycleReference), e
+ * não em "hoje": filtrar agosto responde sobre agosto (inclusive quais
+ * empresas encerram ciclo em agosto), e virar para setembro cai no ciclo
+ * seguinte, zerando o acumulado do ciclo que encerrou.
  */
 export function computeDashboardStats(options: {
   collaborators: CollaboratorRow[];
@@ -31,8 +44,10 @@ export function computeDashboardStats(options: {
   leaves: LeaveRow[];
   areaFilter?: string;
   monthFilter?: string;
+  /** Injetável só para teste — o "hoje" usado para separar competência passada de presente. */
+  today?: Date;
 }): DashboardStats {
-  const { collaborators, companies, managers, cycles, records, leaves, areaFilter, monthFilter } = options;
+  const { collaborators, companies, managers, cycles, records, leaves, areaFilter, monthFilter, today = new Date() } = options;
 
   const withRelations: CollaboratorWithRelations[] = collaborators.map((c) => ({
     ...c,
@@ -42,30 +57,50 @@ export function computeDashboardStats(options: {
 
   const active = withRelations.filter((c) => c.status === 'Ativo' && (!areaFilter || c.area === areaFilter));
 
-  const closingCompanies: CompanyCycleWithCompany[] = cycles
-    .filter((cfg) => isCycleClosingMonth(cfg))
-    .map((cfg) => ({ ...cfg, company: companies.find((co) => co.id === cfg.company_id) ?? null }));
-
-  const cycleAlerts = getCycleAlerts(active, cycles, leaves, records);
-  const complianceAlerts = getComplianceAlerts(active, records, leaves);
-
   const effectivePeriod = monthFilter || getLatestPeriod(records);
+  const reference = buildCycleReference(effectivePeriod ?? currentPeriod(today), today);
+
+  // Um resumo por empresa que tem colaborador ativo em tela, na competência
+  // analisada — inclusive as SEM ciclo cadastrado, que antes sumiam daqui em
+  // silêncio (sem ciclo, o sistema cai numa janela móvel de 4 meses que nunca
+  // encerra e nunca zera o saldo, exatamente o sintoma de "o ciclo encerrou
+  // mas o saldo continua o mesmo").
+  const companyIdsInView = new Set(active.map((c) => c.company_id).filter(Boolean) as string[]);
+  const cycleSummaries: CycleSummary[] = Array.from(companyIdsInView)
+    .map((companyId): CycleSummary => {
+      const config = getCompanyConfig(cycles, companyId);
+      return {
+        cycle: config,
+        company: companies.find((co) => co.id === companyId) ?? null,
+        period: getCyclePeriodForPeriod(config, reference.period),
+        sequence: getCycleSequenceForPeriod(config, reference.period),
+        isClosing: isCycleClosingPeriod(config, reference.period),
+        missingConfig: !config,
+        collaboratorCount: active.filter((c) => c.company_id === companyId).length
+      };
+    })
+    .sort((a, b) => (a.company?.short_name ?? '').localeCompare(b.company?.short_name ?? ''));
+
+  const closingCompanies: CompanyCycleWithCompany[] = cycleSummaries
+    .filter((summary) => summary.isClosing && summary.cycle)
+    .map((summary) => ({ ...(summary.cycle as CompanyCycleRow), company: summary.company }));
+
+  const cycleAlerts = getCycleAlerts(active, cycles, leaves, records, reference);
+  const complianceAlerts = getComplianceAlerts(active, records, leaves, reference);
 
   const periodBalances = effectivePeriod
     ? active.map((c) => ({ collaborator: c, ...getCollaboratorPeriodBalance(c.id, records, effectivePeriod) }))
     : [];
 
-  // Snapshot único de saldo/status do ciclo acumulado até effectivePeriod,
-  // por colaborador ativo — alimenta o ranking (top 8), as contagens
-  // positivo/negativo, o saldo total consolidado e a coluna "Saldo ciclo"
-  // da tabela de Alertas, todos com o mesmo número.
+  // Snapshot único de saldo/status do ciclo acumulado até a competência
+  // analisada, por colaborador ativo — alimenta o ranking (top 8), as
+  // contagens positivo/negativo, o saldo total consolidado e a coluna
+  // "Saldo ciclo" da tabela de Alertas, todos com o mesmo número.
   const cycleSnapshots: RankingEntry[] = active.map((c): RankingEntry => {
     const config = getCompanyConfig(cycles, c.company_id);
-    const cyclePeriod = effectivePeriod ? getCyclePeriodForPeriod(config, effectivePeriod) : getCurrentCyclePeriod(config);
-    const balanceMinutes = effectivePeriod
-      ? getCollaboratorCycleToDateBalance(c.id, records, cyclePeriod, effectivePeriod)
-      : getCollaboratorCycleBalance(c.id, records, cyclePeriod);
-    const status = getCollaboratorStatus(c, balanceMinutes, config, leaves);
+    const cyclePeriod = getCyclePeriodForPeriod(config, reference.period);
+    const balanceMinutes = getCollaboratorCycleToDateBalance(c.id, records, cyclePeriod, reference.period);
+    const status = getCollaboratorStatus(c, balanceMinutes, config, leaves, reference);
     return { collaborator: c, balanceMinutes, status };
   });
 
@@ -80,6 +115,7 @@ export function computeDashboardStats(options: {
     positiveCount: cycleSnapshots.filter((s) => s.balanceMinutes > 0).length,
     negativeCount: cycleSnapshots.filter((s) => s.balanceMinutes < 0).length,
     closingCompanies,
+    cycleSummaries,
     cycleAlerts,
     complianceAlerts,
     totalAlerts: cycleAlerts.length + complianceAlerts.length,

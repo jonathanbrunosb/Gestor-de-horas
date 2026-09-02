@@ -11,7 +11,7 @@ import { Pagination } from '../components/ui/Pagination';
 import { LeaveForm } from '../components/forms/LeaveForm';
 import { computeDashboardStats } from '../services/dashboardService';
 import { minutesToTime } from '../utils/time';
-import { getCycleSequence } from '../utils/cycles';
+import { periodToDate } from '../utils/cycles';
 import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
 import { listSelectableMonths, listAvailablePeriods, getLatestPeriod } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
@@ -340,7 +340,7 @@ export function DashboardPage() {
         <MetricCard title="Débitos no mês" value={minutesToTime(stats.debitTotalMinutes)} note={periodLabel} tone="warning" />
         <MetricCard title="Saldo positivo" value={String(stats.positiveCount)} note="colaboradores · saldo do ciclo" tone="success" />
         <MetricCard title="Saldo negativo" value={String(stats.negativeCount)} note="colaboradores · saldo do ciclo" tone="danger" />
-        <MetricCard title="Empresas encerrando ciclo" value={String(stats.closingCompanies.length)} tone="warning" />
+        <MetricCard title="Empresas encerrando ciclo" value={String(stats.closingCompanies.length)} note={`em ${periodLabel}`} tone="warning" />
         <MetricCard
           title="Alertas do período"
           value={String(stats.totalAlerts)}
@@ -416,9 +416,9 @@ export function DashboardPage() {
 
         <div style={{ display: 'grid', gap: 14 }}>
           <div className="card">
-            <h2 className="section-title">Calendário do mês</h2>
+            <h2 className="section-title">Calendário de {periodLabel}</h2>
             <CalendarGrid
-              month={new Date()}
+              month={periodToDate(effectiveMonthFilter)}
               leavesByDay={leavesByDay}
               criticalDays={new Set()}
               cycleClosingDays={new Set()}
@@ -430,24 +430,32 @@ export function DashboardPage() {
 
           <div className="card">
             <h2 className="section-title">Ciclos por empresa</h2>
-            {!data.cycles.length ? (
-              <EmptyState message="Nenhum ciclo cadastrado." />
+            <p className="section-subtitle">Ciclo de compensação vigente em {periodLabel} para cada empresa com colaborador na visão atual.</p>
+            {!stats.cycleSummaries.length ? (
+              <EmptyState message="Nenhuma empresa com colaborador ativo para os filtros selecionados." />
             ) : (
               <div className="list">
-                {data.cycles.map((cfg) => {
-                  const company = data.companies.find((c) => c.id === cfg.company_id);
-                  return (
-                    <div key={cfg.id} className="list-item">
-                      <div>
-                        <div className="list-title">{company?.short_name ?? '-'}</div>
-                        <div className="list-meta">
-                          Início {cfg.start_month} · {cfg.periodicity_months} meses · posição {getCycleSequence(cfg)}
-                        </div>
+                {stats.cycleSummaries.map((summary) => (
+                  <div key={summary.company?.id ?? summary.cycle?.id ?? 'sem-empresa'} className="list-item">
+                    <div>
+                      <div className="list-title">{summary.company?.short_name ?? '-'}</div>
+                      <div className="list-meta">
+                        {summary.missingConfig ? (
+                          <>Sem ciclo cadastrado — saldo apurado numa janela móvel de 4 meses ({formatPeriodLabel(summary.period.start)} → {formatPeriodLabel(summary.period.end)}), que nunca encerra</>
+                        ) : (
+                          <>
+                            {formatPeriodLabel(summary.period.start)} → {formatPeriodLabel(summary.period.end)} · posição {summary.sequence} · {summary.collaboratorCount} colaborador(es)
+                          </>
+                        )}
                       </div>
-                      {stats.closingCompanies.some((c) => c.id === cfg.id) && <Badge label="Encerrando" tone="warning" />}
                     </div>
-                  );
-                })}
+                    {summary.missingConfig ? (
+                      <Badge label="Sem ciclo" tone="danger" />
+                    ) : summary.isClosing ? (
+                      <Badge label="Encerrando" tone="warning" />
+                    ) : null}
+                  </div>
+                ))}
               </div>
             )}
           </div>
