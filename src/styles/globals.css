@@ -180,6 +180,71 @@ textarea:disabled {
   line-height: 1.5;
 }
 
+/* ══════════════════════════════════════
+   PEOPLE TABS (Base de Colaboradores)
+══════════════════════════════════════ */
+
+.people-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r-md);
+  padding: 4px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-xs);
+  overflow-x: auto;
+}
+
+.people-tab-button {
+  flex: 1;
+  min-height: 44px;
+  min-width: max-content;
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  white-space: nowrap;
+}
+
+.people-tab-button:hover {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+
+.people-tab-button.active,
+.people-tab-button.active:hover {
+  background: var(--navy-700);
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+}
+
+.people-tab-button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(26, 69, 104, 0.25);
+}
+
+.people-tab-panel {
+  min-width: 0;
+}
+
+@media (max-width: 780px) {
+  .people-tabs {
+    width: 100%;
+  }
+
+  .people-tab-button {
+    flex: 1 1 0;
+  }
+}
+
 .grid {
   display: grid;
   gap: 14px;

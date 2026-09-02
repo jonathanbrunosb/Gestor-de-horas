@@ -1,28 +1,42 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/AppDataContext';
 import { PageContent } from '../components/layout/PageContent';
-import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { EmptyState } from '../components/ui/EmptyState';
-import { StatusBadge, Badge } from '../components/ui/Badge';
 import { CollaboratorForm } from '../components/forms/CollaboratorForm';
 import { ManagerForm } from '../components/forms/ManagerForm';
 import { LeaveForm } from '../components/forms/LeaveForm';
 import { AccessProfileForm } from '../components/forms/AccessProfileForm';
+import { PeopleTabs, peopleTabButtonId, peopleTabPanelId, type PeopleTab } from '../components/people/PeopleTabs';
+import { CollaboratorsPanel } from '../components/people/CollaboratorsPanel';
+import { ManagersPanel } from '../components/people/ManagersPanel';
 import { usePersistedFilter } from '../hooks/useFilters';
 import { createCollaborator, deleteCollaborator, updateCollaborator, type CollaboratorInput } from '../services/collaboratorsService';
 import { createManager, deleteManager, updateManager, countCollaboratorsByManager, type ManagerInput } from '../services/managersService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
 import { createAccessProfile, type AccessProfileInput } from '../services/accessProfilesService';
-import { canManageMasterData, canManageAccessProfiles, canEditCollaborators, normalizeMatricula, accessTypeBadgeTone } from '../lib/permissions';
-import { getCollaboratorStatus } from '../utils/compliance';
-import { getCompanyConfig, getCurrentCyclePeriod } from '../utils/cycles';
-import { getCollaboratorCycleBalance } from '../utils/periodBalances';
-import { minutesToTime } from '../utils/time';
+import { canManageMasterData, canManageAccessProfiles, canEditCollaborators, normalizeMatricula } from '../lib/permissions';
+import { PEOPLE_ACTIVE_TAB_KEY } from '../lib/constants';
 import { toISODate } from '../utils/dates';
 import type { CollaboratorRow, ManagerRow } from '../types/database';
+
+function readStoredActiveTab(): PeopleTab {
+  try {
+    const stored = window.localStorage.getItem(PEOPLE_ACTIVE_TAB_KEY);
+    return stored === 'managers' ? 'managers' : 'collaborators';
+  } catch {
+    return 'collaborators';
+  }
+}
+
+function writeStoredActiveTab(tab: PeopleTab): void {
+  try {
+    window.localStorage.setItem(PEOPLE_ACTIVE_TAB_KEY, tab);
+  } catch {
+    /* localStorage indisponível (modo privado, quota) — preferência de UI fica só em memória */
+  }
+}
 
 export function PeoplePage() {
   const { data, access, toast } = useAppContext();
@@ -30,6 +44,13 @@ export function PeoplePage() {
   const canManage = canManageMasterData(access.context.profile?.access_type);
   const canEditCollab = canEditCollaborators(access.context.profile?.access_type);
   const canManageProfiles = canManageAccessProfiles(access.context.profile?.access_type);
+
+  // Preferência puramente visual (qual aba estava aberta) — nunca dado de
+  // negócio. Trocar de aba não recarrega a página nem afeta os filtros
+  // abaixo, que continuam vivendo neste componente independentemente da aba
+  // ativa.
+  const [activeTab, setActiveTab] = useState<PeopleTab>(readStoredActiveTab);
+  useEffect(() => writeStoredActiveTab(activeTab), [activeTab]);
 
   const [companyFilter, setCompanyFilter] = usePersistedFilter('people.company', '');
   const [search, setSearch] = usePersistedFilter('people.search', '');
@@ -173,217 +194,64 @@ export function PeoplePage() {
 
   return (
     <PageContent title="Base de Colaboradores" description="Cadastro oficial de colaboradores e gestores utilizados no monitoramento de banco de horas.">
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 className="section-title" style={{ margin: 0 }}>
-            Colaboradores ({collaboratorRows.length})
-          </h2>
-          {canEditCollab && (
-            <Button
-              size="small"
-              onClick={() => {
-                setEditingCollaborator(null);
-                setCollaboratorModalOpen(true);
-              }}
-            >
-              + Novo colaborador
-            </Button>
-          )}
+      <PeopleTabs activeTab={activeTab} onChange={setActiveTab} />
+
+      {activeTab === 'collaborators' && (
+        <div id={peopleTabPanelId('collaborators')} role="tabpanel" aria-labelledby={peopleTabButtonId('collaborators')} className="people-tab-panel">
+          <CollaboratorsPanel
+            collaboratorRows={collaboratorRows}
+            companies={data.companies}
+            managers={data.managers}
+            cycles={data.cycles}
+            records={data.records}
+            leaves={data.leaves}
+            accessProfileByRegistration={accessProfileByRegistration}
+            companyFilter={companyFilter}
+            onCompanyFilterChange={setCompanyFilter}
+            search={search}
+            onSearchChange={setSearch}
+            canEditCollab={canEditCollab}
+            canManage={canManage}
+            canManageProfiles={canManageProfiles}
+            onNewCollaborator={() => {
+              setEditingCollaborator(null);
+              setCollaboratorModalOpen(true);
+            }}
+            onViewControl={(collaboratorId) => navigate(`/controle-horas?colaborador=${collaboratorId}`)}
+            onEditCollaborator={(c) => {
+              setEditingCollaborator(c);
+              setCollaboratorModalOpen(true);
+            }}
+            onLeaveCollaborator={setLeaveModalCollaborator}
+            onDeleteCollaborator={setDeletingCollaborator}
+            onCreateAccessProfile={setAccessProfileCollaborator}
+          />
         </div>
+      )}
 
-        <div className="filters three" style={{ marginBottom: 12 }}>
-          <div className="field">
-            <label>Empresa</label>
-            <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
-              <option value="">Todas</option>
-              {data.companies.map((c) => (
-                <option key={c.id} value={c.short_name}>
-                  {c.short_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field" style={{ gridColumn: 'span 2' }}>
-            <label>Busca por nome, matrícula, gestor ou e-mail</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
+      {activeTab === 'managers' && (
+        <div id={peopleTabPanelId('managers')} role="tabpanel" aria-labelledby={peopleTabButtonId('managers')} className="people-tab-panel">
+          <ManagersPanel
+            managerRows={managerRows}
+            companies={data.companies}
+            collaborators={data.collaborators}
+            companyFilter={managerCompanyFilter}
+            onCompanyFilterChange={setManagerCompanyFilter}
+            search={managerSearch}
+            onSearchChange={setManagerSearch}
+            canManage={canManage}
+            onNewManager={() => {
+              setEditingManager(null);
+              setManagerModalOpen(true);
+            }}
+            onEditManager={(m) => {
+              setEditingManager(m);
+              setManagerModalOpen(true);
+            }}
+            onDeleteManager={openDeleteManager}
+          />
         </div>
-
-        {!collaboratorRows.length ? (
-          <EmptyState message="Nenhum colaborador cadastrado para os filtros selecionados." />
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Empresa</th>
-                  <th>Matrícula</th>
-                  <th>Colaborador</th>
-                  <th>E-mail</th>
-                  <th>Cargo</th>
-                  <th>Gestor vinculado</th>
-                  <th>Saldo ciclo</th>
-                  <th>Status</th>
-                  <th>Acesso</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {collaboratorRows.map((c) => {
-                  const config = getCompanyConfig(data.cycles, c.company_id);
-                  const cycleBalanceMinutes = getCollaboratorCycleBalance(c.id, data.records, getCurrentCyclePeriod(config));
-                  const status = getCollaboratorStatus(c, cycleBalanceMinutes, config, data.leaves);
-                  const manager = data.managers.find((m) => m.id === c.manager_id);
-                  const accessProfile = accessProfileByRegistration.get(normalizeMatricula(c.registration));
-                  return (
-                    <tr key={c.id}>
-                      <td>{data.companies.find((co) => co.id === c.company_id)?.short_name ?? '-'}</td>
-                      <td className="mono">{c.registration}</td>
-                      <td>{c.name}</td>
-                      <td>{c.email || <span className="muted">Sem e-mail</span>}</td>
-                      <td>{c.title ?? '-'}</td>
-                      <td>{manager?.name ?? c.legacy_manager_name ?? <span className="muted">-</span>}</td>
-                      <td className="mono">{minutesToTime(cycleBalanceMinutes)}</td>
-                      <td>
-                        <StatusBadge status={status} />
-                      </td>
-                      <td>
-                        {accessProfile ? (
-                          <Badge label={accessProfile.access_type} tone={accessTypeBadgeTone(accessProfile.access_type)} />
-                        ) : (
-                          <span className="muted small-text">Sem perfil</span>
-                        )}
-                      </td>
-                      <td className="actions-cell">
-                        <Button size="small" variant="secondary" onClick={() => navigate(`/controle-horas?colaborador=${c.id}`)}>
-                          Ver controle
-                        </Button>
-                        {canEditCollab && (
-                          <Button
-                            size="small"
-                            variant="secondary"
-                            onClick={() => {
-                              setEditingCollaborator(c);
-                              setCollaboratorModalOpen(true);
-                            }}
-                          >
-                            Editar
-                          </Button>
-                        )}
-                        {canManage && (
-                          <>
-                            <Button size="small" variant="secondary" onClick={() => setLeaveModalCollaborator(c)}>
-                              Folga
-                            </Button>
-                            <Button size="small" variant="danger" onClick={() => setDeletingCollaborator(c)}>
-                              Excluir
-                            </Button>
-                          </>
-                        )}
-                        {canManageProfiles && !accessProfile && (
-                          <Button size="small" variant="secondary" onClick={() => setAccessProfileCollaborator(c)}>
-                            Criar perfil de acesso
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 className="section-title" style={{ margin: 0 }}>
-            Gestores ({managerRows.length})
-          </h2>
-          {canManage && (
-            <Button
-              size="small"
-              onClick={() => {
-                setEditingManager(null);
-                setManagerModalOpen(true);
-              }}
-            >
-              + Novo gestor
-            </Button>
-          )}
-        </div>
-
-        <div className="filters three" style={{ marginBottom: 12 }}>
-          <div className="field">
-            <label>Empresa lotação</label>
-            <select value={managerCompanyFilter} onChange={(e) => setManagerCompanyFilter(e.target.value)}>
-              <option value="">Todas</option>
-              {data.companies.map((c) => (
-                <option key={c.id} value={c.short_name}>
-                  {c.short_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field" style={{ gridColumn: 'span 2' }}>
-            <label>Busca por nome, matrícula, e-mail ou área</label>
-            <input value={managerSearch} onChange={(e) => setManagerSearch(e.target.value)} />
-          </div>
-        </div>
-
-        {!managerRows.length ? (
-          <EmptyState message="Nenhum gestor cadastrado para os filtros selecionados." />
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Empresa</th>
-                  <th>Matrícula</th>
-                  <th>Gestor</th>
-                  <th>E-mail</th>
-                  <th>Área</th>
-                  <th>Status</th>
-                  <th>Colaboradores vinculados</th>
-                  {canManage && <th>Ações</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {managerRows.map((m) => (
-                  <tr key={m.id}>
-                    <td>{data.companies.find((c) => c.id === m.company_id)?.short_name ?? 'Corporativo'}</td>
-                    <td className="mono">{m.registration}</td>
-                    <td>{m.name}</td>
-                    <td>{m.email}</td>
-                    <td>{m.area}</td>
-                    <td>
-                      <Badge label={m.status} tone={m.status === 'Ativo' ? 'success' : 'inactive'} />
-                    </td>
-                    <td className="mono">{data.collaborators.filter((c) => c.manager_id === m.id).length}</td>
-                    {canManage && (
-                      <td className="actions-cell">
-                        <Button
-                          size="small"
-                          variant="secondary"
-                          onClick={() => {
-                            setEditingManager(m);
-                            setManagerModalOpen(true);
-                          }}
-                        >
-                          Editar
-                        </Button>
-                        <Button size="small" variant="danger" onClick={() => openDeleteManager(m)}>
-                          Excluir
-                        </Button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
 
       <Modal open={collaboratorModalOpen} title={editingCollaborator ? 'Editar colaborador' : 'Novo colaborador'} onClose={() => setCollaboratorModalOpen(false)} wide>
         <CollaboratorForm
