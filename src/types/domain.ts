@@ -168,7 +168,7 @@ export interface AccessContext {
 }
 
 /** Tipos de ocorrência da tela KPIs - Classe A — um evento por dia (não agregado por colaborador como ComplianceAlert). */
-export type KpiOccurrenceType = 'over_daily_limit' | 'interjornada' | 'intrajornada' | 'batida_incompleta';
+export type KpiOccurrenceType = 'over_daily_limit' | 'interjornada' | 'intrajornada' | 'batida_incompleta' | 'virada_dia';
 
 /** Uma ocorrência individual (um colaborador, um dia, um tipo) para o quadro da tela KPIs - Classe A. */
 export interface KpiOccurrence {

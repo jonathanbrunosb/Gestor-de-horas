@@ -2,6 +2,7 @@ import type { CollaboratorRow, CompanyRow, LeaveRow, ManagerRow, TimeRecordRow }
 import type { CollaboratorWithRelations, KpiClasseAStats, KpiOccurrence, KpiOccurrenceCount, KpiOccurrenceType } from '../types/domain';
 import {
   findBatidaIncompletaViolations,
+  findDayRolloverViolations,
   findInterjornadaViolations,
   findIntrajornadaViolations,
   findOverDailyLimitViolations,
@@ -18,13 +19,14 @@ export const QUARTER_LABELS: Record<Quarter, string> = {
   4: 'Out - Dez'
 };
 
-export const KPI_OCCURRENCE_TYPES: KpiOccurrenceType[] = ['over_daily_limit', 'interjornada', 'intrajornada', 'batida_incompleta'];
+export const KPI_OCCURRENCE_TYPES: KpiOccurrenceType[] = ['over_daily_limit', 'interjornada', 'intrajornada', 'batida_incompleta', 'virada_dia'];
 
 export const KPI_OCCURRENCE_LABELS: Record<KpiOccurrenceType, string> = {
   over_daily_limit: 'H Trab. Acima do Limite (+2h)',
   interjornada: 'Interjornada Diária (11h)',
   intrajornada: 'Intrajornada (1h)',
-  batida_incompleta: 'Batida Incompleta'
+  batida_incompleta: 'Batida Incompleta',
+  virada_dia: 'Virada de Dia (possível falha de marcação)'
 };
 
 /** Meses (YYYY-MM) do trimestre informado, em ordem cronológica. */
@@ -69,9 +71,13 @@ export function getAvailableKpiYears(records: TimeRecordRow[], today: Date = new
  * Reaproveita as mesmas regras de interjornada/intrajornada/batida
  * incompleta já usadas no Dashboard (getWorkingRecordsForPeriod + os
  * find*Violations de utils/compliance.ts) — nenhuma regra existente foi
- * alterada, só extraída para ser reutilizável por dia. A única regra nova é
+ * alterada, só extraída para ser reutilizável por dia. As regras novas são
  * "H Trab. Acima do Limite (+2h)" (findOverDailyLimitViolations): jornada de
- * 8h + até 2h extras = 10h/dia; acima disso é ocorrência.
+ * 8h + até 2h extras/dia, calculado direto das marcações; e "Virada de Dia"
+ * (findDayRolloverViolations): dias em que a marcação de saída parece ter
+ * "vazado" para o dia seguinte (indício de batida faltando) — ficam de fora
+ * da contagem de H Trab. Acima do Limite (o trabalhado calculado ali não é
+ * confiável) e aparecem como um alerta separado para revisão manual.
  */
 export function computeKpiClasseAStats(options: {
   collaborators: CollaboratorRow[];
@@ -106,6 +112,7 @@ export function computeKpiClasseAStats(options: {
       for (const v of findInterjornadaViolations(workRecs)) push('interjornada', v.date, v.record.punches ?? []);
       for (const v of findIntrajornadaViolations(workRecs)) push('intrajornada', v.date, v.record.punches ?? []);
       for (const v of findBatidaIncompletaViolations(workRecs, registeredLeaves)) push('batida_incompleta', v.date, v.record.punches ?? []);
+      for (const v of findDayRolloverViolations(workRecs)) push('virada_dia', v.date, v.record.punches ?? []);
     }
   }
 

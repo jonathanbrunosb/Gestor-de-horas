@@ -3,7 +3,7 @@ import type { CollaboratorWithRelations, ComplianceAlert, CycleAlert, CycleRefer
 import { NON_WORK_SCHEDULE_CODES } from '../lib/constants';
 import { formatDate, toISODate } from './dates';
 import { timeOfDayToMinutes } from './time';
-import { computeRawWorkedMinutes } from './imports';
+import { computeRawWorkedMinutes, hasDayRollover } from './imports';
 import {
   getCompanyConfig,
   getCurrentCyclePeriod,
@@ -130,9 +130,29 @@ export function getDailyExtraMinutes(record: TimeRecordRow): number {
   return Math.max(0, computeRawWorkedMinutes(record.punches || []) - DAILY_JOURNEY_MINUTES);
 }
 
-/** Dias com horas extras acima do limite diário permitido pelo ACT (2h). */
+/**
+ * Dias com horas extras acima do limite diário permitido pelo ACT (2h).
+ * Exclui dias com virada de dia (ver findDayRolloverViolations) — nesses
+ * dias o trabalhado bruto pode chegar a 14h+ por causa de uma marcação de
+ * saída provavelmente faltando (o sistema soma até o dia seguinte), então o
+ * excedente calculado não é confiável para contar aqui; o dia ainda aparece,
+ * só que como o alerta separado de virada de dia, para revisão manual.
+ */
 export function findOverDailyLimitViolations(workRecs: TimeRecordRow[]): DailyViolation[] {
-  return workRecs.filter((rec) => getDailyExtraMinutes(rec) > DAILY_EXTRA_LIMIT_MINUTES).map((rec) => ({ date: rec.record_date, record: rec }));
+  return workRecs
+    .filter((rec) => !hasDayRollover(rec.punches || []) && getDailyExtraMinutes(rec) > DAILY_EXTRA_LIMIT_MINUTES)
+    .map((rec) => ({ date: rec.record_date, record: rec }));
+}
+
+/**
+ * Dias em que a saída registrada (4ª marcação) é numericamente anterior à
+ * volta do almoço (3ª marcação) — indício de marcação de saída faltando,
+ * não necessariamente um dia de 14h+ de trabalho real. Alerta separado
+ * (tela KPIs - Classe A) para revisão manual, fora da contagem de "H Trab.
+ * Acima do Limite".
+ */
+export function findDayRolloverViolations(workRecs: TimeRecordRow[]): DailyViolation[] {
+  return workRecs.filter((rec) => hasDayRollover(rec.punches || [])).map((rec) => ({ date: rec.record_date, record: rec }));
 }
 
 /**

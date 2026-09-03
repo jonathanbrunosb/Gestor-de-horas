@@ -60,6 +60,22 @@ export function computeRawWorkedMinutes(punches: string[]): number {
   return s1 + s2;
 }
 
+/**
+ * true quando a saída (4ª marcação) é numericamente anterior à volta do
+ * almoço (3ª marcação) — computeRawWorkedMinutes interpreta isso como
+ * virada de dia (ex.: volta 14:00, sai 00:40 do dia seguinte) e soma até
+ * 24h no trabalhado. Na prática, quase sempre é falta da batida de saída
+ * real (o sistema "vaza" para a primeira marcação do dia seguinte) — por
+ * isso a tela KPIs - Classe A trata como um alerta de qualidade de dado
+ * separado, em vez de somar ao trabalhado do dia.
+ */
+export function hasDayRollover(punches: string[]): boolean {
+  const [, , m3, m4] = punches;
+  const p3 = toMin(m3);
+  const p4 = toMin(m4);
+  return p3 >= 0 && p4 >= 0 && p4 < p3;
+}
+
 function calcNight(start: number, end: number): number {
   if (start < 0 || end < 0) return 0;
   if (end < start) end += 1440;
