@@ -6,6 +6,7 @@ import { ImportPreview } from '../components/import/ImportPreview';
 import { ManualImportModal } from '../components/import/ManualImportModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Button } from '../components/ui/Button';
+import { Pagination } from '../components/ui/Pagination';
 import type { ImportFileType } from '../types/database';
 import type { ImportPreviewResult, ImportedRecord } from '../types/imports';
 import { parseDelimitedFile } from '../utils/csvParser';
@@ -14,6 +15,8 @@ import { formatImportSummary } from '../utils/formatters';
 import { formatDateTime } from '../utils/dates';
 import { canManageMasterData, canImportTimeSheets } from '../lib/permissions';
 import { EmptyState } from '../components/ui/EmptyState';
+
+const IMPORTS_HISTORY_PAGE_SIZE = 10;
 
 function detectFileType(fileName: string): ImportFileType {
   const ext = fileName.toLowerCase().split('.').pop();
@@ -31,6 +34,7 @@ export function UploadPage() {
   const [confirming, setConfirming] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [lastFailedFile, setLastFailedFile] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
 
   const canImport = canImportTimeSheets(access.context.profile?.access_type);
   const canClearImported = canManageMasterData(access.context.profile?.access_type);
@@ -94,6 +98,7 @@ export function UploadPage() {
       });
       toast.notify(formatImportSummary(summary), 'success');
       setPreview(null);
+      setHistoryPage(1);
       data.reload();
     } catch (error) {
       toast.notify(error instanceof Error ? error.message : 'Falha ao confirmar importação.', 'danger');
@@ -171,7 +176,7 @@ export function UploadPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.imports.map((imp) => (
+                {data.imports.slice((historyPage - 1) * IMPORTS_HISTORY_PAGE_SIZE, historyPage * IMPORTS_HISTORY_PAGE_SIZE).map((imp) => (
                   <tr key={imp.id}>
                     <td>{formatDateTime(imp.created_at)}</td>
                     <td>{imp.filename}</td>
@@ -189,6 +194,7 @@ export function UploadPage() {
             </table>
           </div>
         )}
+        <Pagination page={historyPage} pageSize={IMPORTS_HISTORY_PAGE_SIZE} totalItems={data.imports.length} onPageChange={setHistoryPage} />
       </div>
 
       <ManualImportModal open={manualOpen} onClose={() => setManualOpen(false)} onSubmit={handleManualSubmit} />
