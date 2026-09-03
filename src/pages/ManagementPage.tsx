@@ -135,7 +135,7 @@ export function ManagementPage() {
 
   return (
     <PageContent title="Gestão BH / Pagamento" description="Visão executiva do banco de horas acumulado, compensado e exposição financeira por empresa.">
-      <div className="grid cards-4" style={{ marginBottom: 14 }}>
+      <div className="grid cards-6" style={{ marginBottom: 14 }}>
         <MetricCard title="Colaboradores monitorados" value={String(totals.totalCollaborators)} tone="neutral" />
         <MetricCard title="BH acumulado no ciclo" value={minutesToTime(totals.accumulated)} tone="info" />
         <MetricCard title="Horas compensadas" value={minutesToTime(totals.compensated)} tone="success" />
