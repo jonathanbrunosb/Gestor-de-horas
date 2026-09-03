@@ -101,18 +101,28 @@ export function findBatidaIncompletaViolations(workRecs: TimeRecordRow[], regist
 }
 
 /**
- * Jornada diária padrão (8h) + limite de horas extras diárias (2h) = 10h.
- * Acima disso, o dia infringe a regra de horas trabalhadas acima do limite
- * (tela KPIs - Classe A). Não é o mesmo limite de DEFAULT_POSITIVE_ALERT_MINUTES
- * (esse é o saldo ACUMULADO do ciclo de banco de horas; este aqui é por dia).
+ * Limite de horas extras diárias (2h) além da jornada — tela KPIs - Classe A.
+ *
+ * IMPORTANTE: o excedente do dia NÃO aparece em worked_minutes. Esse campo já
+ * chega limitado à jornada padrão desde a origem (cartão-ponto legado e
+ * calcPunchMetrics em utils/imports.ts: "Trab." nunca passa da jornada — o
+ * que passou vira Crédito BH, ou, em dia não útil, Hora Extra 100%; ver o
+ * comentário de inferStandardMinutes). Por isso a regra soma
+ * credit_bh_minutes + extra_50_minutes + extra_100_minutes do dia — essas três
+ * colunas juntas são o total de horas extras do dia, banco de horas ou pagas.
+ * Não é o mesmo limite de DEFAULT_POSITIVE_ALERT_MINUTES (esse é o saldo
+ * ACUMULADO do ciclo; este aqui é por dia).
  */
-export const DAILY_JOURNEY_MINUTES = 480;
 export const DAILY_EXTRA_LIMIT_MINUTES = 120;
-export const DAILY_WORKED_LIMIT_MINUTES = DAILY_JOURNEY_MINUTES + DAILY_EXTRA_LIMIT_MINUTES;
 
-/** Dias com horas trabalhadas acima do limite diário (jornada + extra permitido). */
+/** Total de horas extras registradas no dia (banco de horas + pagas), a partir dos campos já importados. */
+export function getDailyExtraMinutes(record: TimeRecordRow): number {
+  return (record.credit_bh_minutes || 0) + (record.extra_50_minutes || 0) + (record.extra_100_minutes || 0);
+}
+
+/** Dias com horas extras acima do limite diário permitido (2h). */
 export function findOverDailyLimitViolations(workRecs: TimeRecordRow[]): DailyViolation[] {
-  return workRecs.filter((rec) => rec.worked_minutes > DAILY_WORKED_LIMIT_MINUTES).map((rec) => ({ date: rec.record_date, record: rec }));
+  return workRecs.filter((rec) => getDailyExtraMinutes(rec) > DAILY_EXTRA_LIMIT_MINUTES).map((rec) => ({ date: rec.record_date, record: rec }));
 }
 
 /**
