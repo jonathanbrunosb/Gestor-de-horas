@@ -3,6 +3,7 @@ import type { CollaboratorWithRelations, ComplianceAlert, CycleAlert, CycleRefer
 import { NON_WORK_SCHEDULE_CODES } from '../lib/constants';
 import { formatDate, toISODate } from './dates';
 import { timeOfDayToMinutes } from './time';
+import { computeRawWorkedMinutes } from './imports';
 import {
   getCompanyConfig,
   getCurrentCyclePeriod,
@@ -101,26 +102,35 @@ export function findBatidaIncompletaViolations(workRecs: TimeRecordRow[], regist
 }
 
 /**
- * Limite de horas extras diárias (2h) além da jornada — tela KPIs - Classe A.
+ * Regra do ACT — jornada padrão de 8h + até 2h extras/dia. Acima disso, o dia
+ * infringe o acordo (tela KPIs - Classe A). Ex.: entra 08:00, sai 12:00,
+ * volta 14:00, sai 20:00 -> 10h trabalhadas, 2h extras, dentro do ACT. Se a
+ * saída final fosse 20:45 -> 10h45, 2h45 extras: as 2h primeiras vão para o
+ * banco de horas normalmente, e os 45min excedentes é que configuram a
+ * infração — ou seja, o que importa é o total de horas extras do dia
+ * (trabalhado − jornada), não uma das parcelas em que ele é dividido depois.
  *
- * IMPORTANTE: o excedente do dia NÃO aparece em worked_minutes. Esse campo já
- * chega limitado à jornada padrão desde a origem (cartão-ponto legado e
- * calcPunchMetrics em utils/imports.ts: "Trab." nunca passa da jornada — o
- * que passou vira Crédito BH, ou, em dia não útil, Hora Extra 100%; ver o
- * comentário de inferStandardMinutes). Por isso a regra soma
- * credit_bh_minutes + extra_50_minutes + extra_100_minutes do dia — essas três
- * colunas juntas são o total de horas extras do dia, banco de horas ou pagas.
+ * IMPORTANTE: por isso o cálculo usa o trabalhado BRUTO recalculado direto
+ * das marcações (computeRawWorkedMinutes, utils/imports.ts) — nunca
+ * worked_minutes (esse campo já chega limitado à jornada desde a origem:
+ * cartão-ponto legado / calcPunchMetrics, "Trab." nunca passa de 8h) nem as
+ * colunas credit_bh_minutes/extra_50_minutes/extra_100_minutes (essas podem
+ * vir do arquivo importado já reclassificadas/divididas por outras regras da
+ * folha, sem garantia de somarem de volta ao excedente real do dia — foi
+ * essa suposição que causou contagem incorreta antes). Recalcular das 4
+ * marcações elimina essa dependência e reproduz exatamente o exemplo acima.
  * Não é o mesmo limite de DEFAULT_POSITIVE_ALERT_MINUTES (esse é o saldo
  * ACUMULADO do ciclo; este aqui é por dia).
  */
+export const DAILY_JOURNEY_MINUTES = 480;
 export const DAILY_EXTRA_LIMIT_MINUTES = 120;
 
-/** Total de horas extras registradas no dia (banco de horas + pagas), a partir dos campos já importados. */
+/** Horas extras do dia (trabalhado bruto pelas marcações − jornada padrão de 8h), nunca negativo. */
 export function getDailyExtraMinutes(record: TimeRecordRow): number {
-  return (record.credit_bh_minutes || 0) + (record.extra_50_minutes || 0) + (record.extra_100_minutes || 0);
+  return Math.max(0, computeRawWorkedMinutes(record.punches || []) - DAILY_JOURNEY_MINUTES);
 }
 
-/** Dias com horas extras acima do limite diário permitido (2h). */
+/** Dias com horas extras acima do limite diário permitido pelo ACT (2h). */
 export function findOverDailyLimitViolations(workRecs: TimeRecordRow[]): DailyViolation[] {
   return workRecs.filter((rec) => getDailyExtraMinutes(rec) > DAILY_EXTRA_LIMIT_MINUTES).map((rec) => ({ date: rec.record_date, record: rec }));
 }

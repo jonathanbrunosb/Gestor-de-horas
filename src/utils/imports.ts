@@ -37,6 +37,29 @@ function toMin(value: string | undefined): number {
   return match ? parseInt(match[1], 10) * 60 + parseInt(match[2], 10) : -1;
 }
 
+/**
+ * Total efetivamente trabalhado no dia a partir das 4 marcações (entrada,
+ * saída almoço, volta almoço, saída), SEM limitar à jornada — trata virada de
+ * dia na volta do almoço (ex.: entra 22:00, sai 06:00). É o valor cru: quem
+ * precisa do trabalhado já limitado à jornada (para saber crédito/débito de
+ * BH) usa calcPunchMetrics, que reaproveita esta função por baixo. Usado
+ * também pela tela KPIs - Classe A (utils/compliance.ts) para checar o limite
+ * de horas extras diárias direto das marcações, sem depender de nenhuma
+ * coluna já calculada na importação.
+ */
+export function computeRawWorkedMinutes(punches: string[]): number {
+  const [m1, m2, m3, m4] = punches;
+  const p1 = toMin(m1);
+  const p2 = toMin(m2);
+  const p3 = toMin(m3);
+  const p4 = toMin(m4);
+
+  const s1 = p1 >= 0 && p2 > p1 ? p2 - p1 : 0;
+  let s2 = 0;
+  if (p3 >= 0 && p4 >= 0) s2 = p4 >= p3 ? p4 - p3 : 1440 - p3 + p4;
+  return s1 + s2;
+}
+
 function calcNight(start: number, end: number): number {
   if (start < 0 || end < 0) return 0;
   if (end < start) end += 1440;
@@ -61,10 +84,7 @@ export function calcPunchMetrics(punches: string[], scheduleCode: string, weekda
   const p3 = toMin(m3);
   const p4 = toMin(m4);
 
-  const s1 = p1 >= 0 && p2 > p1 ? p2 - p1 : 0;
-  let s2 = 0;
-  if (p3 >= 0 && p4 >= 0) s2 = p4 >= p3 ? p4 - p3 : 1440 - p3 + p4;
-  const worked = s1 + s2;
+  const worked = computeRawWorkedMinutes(punches);
   if (worked <= 0) return { ...EMPTY_METRICS };
 
   const standard = scheduleCode === '0001' ? 480 : worked;
