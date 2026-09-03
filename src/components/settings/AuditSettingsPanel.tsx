@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MetricCard } from '../ui/MetricCard';
 import { EmptyState } from '../ui/EmptyState';
+import { Pagination } from '../ui/Pagination';
 import { AuditFiltersBar } from '../audit/AuditFilters';
 import { AuditTable } from '../audit/AuditTable';
 import { AuditDetailsModal } from '../audit/AuditDetailsModal';
@@ -8,6 +9,7 @@ import { listAuditLogs } from '../../services/auditLogService';
 import type { AuditFilters, AuditLog } from '../../types/audit';
 
 const SEARCH_DEBOUNCE_MS = 400;
+const AUDIT_PAGE_SIZE = 25;
 
 interface AuditSettingsPanelProps {
   canView: boolean;
@@ -27,6 +29,7 @@ export function AuditSettingsPanel({ canView }: AuditSettingsPanelProps) {
   const [loading, setLoading] = useState(canView);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [page, setPage] = useState(1);
 
   // Busca livre não dispara uma consulta por tecla digitada — só depois de
   // uma pequena pausa. Os demais filtros (datas/selects) mudam em blocos,
@@ -43,7 +46,10 @@ export function AuditSettingsPanel({ canView }: AuditSettingsPanelProps) {
     setError(null);
     listAuditLogs(debouncedFilters)
       .then((data) => {
-        if (!cancelled) setLogs(data);
+        if (!cancelled) {
+          setLogs(data);
+          setPage(1);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Falha ao carregar a trilha de auditoria.');
@@ -97,7 +103,10 @@ export function AuditSettingsPanel({ canView }: AuditSettingsPanelProps) {
             {error}
           </p>
         ) : (
-          <AuditTable logs={logs} onViewDetails={setSelectedLog} />
+          <>
+            <AuditTable logs={logs.slice((page - 1) * AUDIT_PAGE_SIZE, page * AUDIT_PAGE_SIZE)} onViewDetails={setSelectedLog} />
+            <Pagination page={page} pageSize={AUDIT_PAGE_SIZE} totalItems={logs.length} onPageChange={setPage} />
+          </>
         )}
       </div>
 
