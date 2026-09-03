@@ -16,14 +16,10 @@ import { formatDate, formatPeriodLabel, toISODate } from '../utils/dates';
 import { listSelectableMonths, listAvailablePeriods, getLatestPeriod } from '../utils/periodBalances';
 import { hasCollaboratorEmail, type MailtoAlertType } from '../utils/mailto';
 import { generateAndLogNotification } from '../services/notificationsService';
-import { createAuditLog } from '../services/auditLogService';
 import { createLeave, type LeaveInput } from '../services/leavesService';
 import type { BadgeTone, CollaboratorWithRelations, LeaveWithRelations } from '../types/domain';
-import { canResetDatabase, canRegisterLeaves } from '../lib/permissions';
-import { resetDatabase } from '../services/resetService';
-import { downloadFile } from '../utils/formatters';
+import { canRegisterLeaves } from '../lib/permissions';
 import { Button } from '../components/ui/Button';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 interface AlertRow {
   key: string;
@@ -48,7 +44,6 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [areaFilter, setAreaFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
-  const [resetOpen, setResetOpen] = useState(false);
   const [leaveModal, setLeaveModal] = useState<{ collaborator: CollaboratorWithRelations; date: string } | null>(null);
   const [alertsPage, setAlertsPage] = useState(1);
   const ALERTS_PAGE_SIZE = 10;
@@ -226,42 +221,6 @@ export function DashboardPage() {
 
   const canManageLeaves = canRegisterLeaves(access.context.profile?.access_type);
 
-  async function handleExportJson() {
-    const payload = {
-      companies: data.companies,
-      collaborators: data.collaborators,
-      managers: data.managers,
-      cycles: data.cycles,
-      leaves: data.leaves,
-      records: data.records,
-      accessProfiles: data.accessProfiles,
-      exportedAt: new Date().toISOString()
-    };
-    downloadFile(`monitor-controles-horas-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), 'application/json');
-    void createAuditLog({
-      action: 'export.json',
-      actorRegistration: access.context.matricula,
-      entityType: 'database',
-      entityLabel: 'Backup completo (Dashboard)',
-      metadata: { collaborators: data.collaborators.length, records: data.records.length }
-    });
-    toast.notify('Backup JSON exportado.', 'success');
-  }
-
-  async function handleReset() {
-    try {
-      await resetDatabase(
-        { collaborators: true, managers: true, records: true, leaves: true, imports: true, cycles: false },
-        access.context.matricula
-      );
-      toast.notify('Base resetada. Perfis de acesso e ciclos foram preservados.', 'success');
-      setResetOpen(false);
-      data.reload();
-    } catch (error) {
-      toast.notify(error instanceof Error ? error.message : 'Falha ao resetar a base.', 'danger');
-    }
-  }
-
   async function handleNotify(row: AlertRow) {
     try {
       const { mailtoUrl } = await generateAndLogNotification(
@@ -284,8 +243,6 @@ export function DashboardPage() {
       toast.notify(error instanceof Error ? error.message : 'Falha ao registrar folga.', 'danger');
     }
   }
-
-  const canReset = canResetDatabase(access.context.profile?.access_type);
 
   return (
     <PageContent
@@ -314,14 +271,6 @@ export function DashboardPage() {
               ))}
             </select>
           </div>
-          <Button variant="secondary" onClick={handleExportJson}>
-            Exportar JSON
-          </Button>
-          {canReset && (
-            <Button variant="danger" onClick={() => setResetOpen(true)}>
-              Resetar base
-            </Button>
-          )}
         </>
       }
     >
@@ -534,16 +483,6 @@ export function DashboardPage() {
           />
         )}
       </Modal>
-
-      <ConfirmDialog
-        open={resetOpen}
-        title="Resetar base de dados"
-        message="Esta ação apaga colaboradores, gestores, registros de ponto, folgas e importações. Perfis de acesso e ciclos configurados são preservados. Esta ação não pode ser desfeita."
-        confirmLabel="Resetar base"
-        danger
-        onConfirm={handleReset}
-        onCancel={() => setResetOpen(false)}
-      />
     </PageContent>
   );
 }
