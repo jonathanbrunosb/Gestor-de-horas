@@ -68,6 +68,15 @@ const managementIcon: ReactNode = (
   </svg>
 );
 
+const kpiIcon: ReactNode = (
+  <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+    <polyline points="1.5,13 1.5,1.5 13.5,1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="3.5" y="8.5" width="2.4" height="4.2" rx="0.6" fill="currentColor" />
+    <rect x="7.3" y="5.5" width="2.4" height="7.2" rx="0.6" fill="currentColor" />
+    <rect x="11.1" y="3.5" width="2.4" height="9.2" rx="0.6" fill="currentColor" />
+  </svg>
+);
+
 const peopleIcon: ReactNode = (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
     <circle cx="7.5" cy="5" r="3" stroke="currentColor" strokeWidth="1.5" />
@@ -103,7 +112,9 @@ const settingsIcon: ReactNode = (
  * tem canEditCollaborators/canImportTimeSheets nessas telas; Gerente/
  * Executivo não entram em Upload porque não têm canImportTimeSheets lá.
  * Facilitador não entra em Gestão BH / Pagamento — módulo de exposição
- * financeira fora do escopo operacional desse perfil.
+ * financeira fora do escopo operacional desse perfil. KPIs - Classe A segue a
+ * mesma restrição: é acompanhamento gerencial nominal (ocorrências de
+ * jornada por colaborador), não operacional.
  */
 export const MENU_GROUPS: MenuGroup[] = [
   {
@@ -123,6 +134,13 @@ export const MENU_GROUPS: MenuGroup[] = [
         label: 'Gestão BH / Pagamento',
         route: '/gestao-bh',
         icon: managementIcon,
+        allowedRoles: ['Desenvolvedor', 'Administrador', 'Gerente', 'Executivo']
+      },
+      {
+        id: 'kpi-classe-a',
+        label: 'KPIs - Classe A',
+        route: '/kpis-classe-a',
+        icon: kpiIcon,
         allowedRoles: ['Desenvolvedor', 'Administrador', 'Gerente', 'Executivo']
       }
     ]

@@ -167,4 +167,28 @@ export interface AccessContext {
   reason: string;
 }
 
+/** Tipos de ocorrência da tela KPIs - Classe A — um evento por dia (não agregado por colaborador como ComplianceAlert). */
+export type KpiOccurrenceType = 'over_daily_limit' | 'interjornada' | 'intrajornada' | 'batida_incompleta';
+
+/** Uma ocorrência individual (um colaborador, um dia, um tipo) para o quadro da tela KPIs - Classe A. */
+export interface KpiOccurrence {
+  type: KpiOccurrenceType;
+  collaborator: CollaboratorWithRelations;
+  date: string; // YYYY-MM-DD
+  punches: string[];
+}
+
+/** Contagem de ocorrências agrupadas por competência (mês do trimestre) ou por tipo — alimenta os dois gráficos da tela. */
+export interface KpiOccurrenceCount {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface KpiClasseAStats {
+  occurrences: KpiOccurrence[];
+  byMonth: KpiOccurrenceCount[];
+  byType: KpiOccurrenceCount[];
+}
+
 export type { CollaboratorRow, TimeRecordRow, LeaveRow, ManagerRow, AccessProfileRow, CompanyRow, CompanyCycleRow, ImportRow, DayType, AccessType };

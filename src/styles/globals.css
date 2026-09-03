@@ -290,6 +290,129 @@ textarea:disabled {
   font-size: 12.5px;
 }
 
+/* ══════════════════════════════════════
+   KPIS - CLASSE A (Gestão de horas → KPIs - Classe A)
+══════════════════════════════════════ */
+
+.grid.charts-split {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Grupo de botões Trimestre — mais largo que um select, então quebra em
+   coluna (rótulo em cima, botões embaixo) e os próprios botões quebram
+   linha em telas estreitas, para nunca forçar scroll/corte no topbar. */
+.quarter-filter {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quarter-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kpi-chart-card .section-title {
+  text-align: center;
+}
+
+.kpi-chart-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.kpi-chart-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--navy-700);
+}
+
+.kpi-bars-vertical {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 16px;
+  height: 200px;
+  padding: 0 8px;
+}
+
+.kpi-bar-vertical-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 0;
+  height: 100%;
+  min-width: 0;
+}
+
+.kpi-bar-vertical-track {
+  width: 100%;
+  max-width: 96px;
+  height: 140px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.kpi-bar-vertical-fill {
+  width: 100%;
+  min-height: 2px;
+  background: var(--navy-700);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  transition: height 0.25s ease;
+}
+
+.kpi-bar-label {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.kpi-bar-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.kpi-bars-horizontal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kpi-bar-horizontal-item {
+  display: grid;
+  grid-template-columns: minmax(90px, 180px) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.kpi-bar-horizontal-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpi-bar-horizontal-track {
+  height: 18px;
+  background: var(--surface-alt);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.kpi-bar-horizontal-fill {
+  height: 100%;
+  min-width: 2px;
+  background: var(--navy-700);
+  border-radius: var(--r-sm);
+  transition: width 0.25s ease;
+}
+
 .grid {
   display: grid;
   gap: 14px;
@@ -467,7 +590,8 @@ textarea:disabled {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .grid.two-col,
-  .grid.calendar-split {
+  .grid.calendar-split,
+  .grid.charts-split {
     grid-template-columns: 1fr;
   }
   .filters,
