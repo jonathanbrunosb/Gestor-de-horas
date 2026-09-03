@@ -15,7 +15,8 @@ import { createAccessProfile, deleteAccessProfile, updateAccessProfile, type Acc
 import { createCycle, deleteCycle, restoreDefaultCycles, type CycleInput } from '../services/cyclesService';
 import { importLegacyJson } from '../services/jsonImportService';
 import { createAuditLog } from '../services/auditLogService';
-import { canManageAccessProfiles, canManageMasterData, canViewAuditLogs } from '../lib/permissions';
+import { resetDatabase } from '../services/resetService';
+import { canManageAccessProfiles, canManageMasterData, canResetDatabase, canViewAuditLogs } from '../lib/permissions';
 import { SETTINGS_ACTIVE_TAB_KEY } from '../lib/constants';
 import { downloadFile } from '../utils/formatters';
 import type { AccessProfileRow, CompanyCycleRow } from '../types/database';
@@ -59,11 +60,13 @@ export function SettingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [pendingBackup, setPendingBackup] = useState<{ fileName: string; payload: LegacyJsonExport } | null>(null);
   const [importingBackup, setImportingBackup] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
 
   const canManageProfiles = canManageAccessProfiles(access.context.profile?.access_type);
   const canManageCycles = canManageMasterData(access.context.profile?.access_type);
   const canViewAudit = canViewAuditLogs(access.context.profile?.access_type);
+  const canReset = canResetDatabase(access.context.profile?.access_type);
 
   const filteredProfiles = useMemo(() => {
     return data.accessProfiles
@@ -174,6 +177,20 @@ export function SettingsPage() {
     }
   }
 
+  async function handleReset() {
+    try {
+      await resetDatabase(
+        { collaborators: true, managers: true, records: true, leaves: true, imports: true, cycles: false },
+        access.context.matricula
+      );
+      toast.notify('Base resetada. Perfis de acesso e ciclos foram preservados.', 'success');
+      setResetOpen(false);
+      data.reload();
+    } catch (error) {
+      toast.notify(error instanceof Error ? error.message : 'Falha ao resetar a base.', 'danger');
+    }
+  }
+
   async function handleConfirmBackupImport() {
     if (!pendingBackup) return;
     setImportingBackup(true);
@@ -238,6 +255,8 @@ export function SettingsPage() {
             onNewCycle={() => setCycleModalOpen(true)}
             onRestoreDefaults={handleRestoreDefaults}
             onDeleteCycle={setDeletingCycle}
+            canReset={canReset}
+            onResetClick={() => setResetOpen(true)}
           />
         </div>
       )}
@@ -325,6 +344,16 @@ export function SettingsPage() {
         danger
         onConfirm={handleDeleteCycle}
         onCancel={() => setDeletingCycle(null)}
+      />
+
+      <ConfirmDialog
+        open={resetOpen}
+        title="Resetar base de dados"
+        message="Esta ação apaga colaboradores, gestores, registros de ponto, folgas e importações. Perfis de acesso e ciclos configurados são preservados. Esta ação não pode ser desfeita."
+        confirmLabel="Resetar base"
+        danger
+        onConfirm={handleReset}
+        onCancel={() => setResetOpen(false)}
       />
     </PageContent>
   );

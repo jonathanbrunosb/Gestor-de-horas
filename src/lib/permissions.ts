@@ -61,8 +61,15 @@ export function canManageMasterData(accessType: AccessType | null | undefined): 
   return accessType === 'Desenvolvedor' || accessType === 'Administrador';
 }
 
+/**
+ * Resetar a base (apaga colaboradores, gestores, registros de ponto, folgas
+ * e importações). Restrito só ao Desenvolvedor — antes também incluía
+ * Administrador, mas a pedido explícito, ao mover essa ação para
+ * Configurações como "ação sensível separada", o acesso foi restringido ao
+ * perfil mais alto do sistema.
+ */
 export function canResetDatabase(accessType: AccessType | null | undefined): boolean {
-  return accessType === 'Desenvolvedor' || accessType === 'Administrador';
+  return accessType === 'Desenvolvedor';
 }
 
 /** Cadastrar/editar colaboradores — não inclui excluir (ação destrutiva, fora do escopo do Facilitador). */

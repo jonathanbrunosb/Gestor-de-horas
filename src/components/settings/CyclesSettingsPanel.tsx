@@ -22,6 +22,8 @@ interface CyclesSettingsPanelProps {
   onNewCycle: () => void;
   onRestoreDefaults: () => void;
   onDeleteCycle: (cycle: CompanyCycleRow) => void;
+  canReset: boolean;
+  onResetClick: () => void;
 }
 
 /**
@@ -31,7 +33,10 @@ interface CyclesSettingsPanelProps {
  * "Base compartilhada (Supabase)" (conexão, contagens, backup): não foi
  * atribuído a nenhuma aba no escopo e usa a mesma permissão
  * (canManageMasterData) da gestão de ciclos, então fica aqui em vez de
- * inventar uma quarta aba fora do pedido.
+ * inventar uma quarta aba fora do pedido. O card "Zona de risco" (resetar a
+ * base) foi relocado do Dashboard para cá — fica separado visualmente e usa
+ * uma permissão própria (canReset, restrita ao Desenvolvedor), mais estreita
+ * que canManageCycles.
  */
 export function CyclesSettingsPanel({
   companies,
@@ -47,7 +52,9 @@ export function CyclesSettingsPanel({
   onBackupFileSelected,
   onNewCycle,
   onRestoreDefaults,
-  onDeleteCycle
+  onDeleteCycle,
+  canReset,
+  onResetClick
 }: CyclesSettingsPanelProps) {
   return (
     <>
@@ -166,6 +173,21 @@ export function CyclesSettingsPanel({
           </div>
         )}
       </div>
+
+      {canReset && (
+        <div className="card" style={{ marginTop: 14, borderColor: 'var(--danger-mid)', background: 'var(--danger-bg)' }}>
+          <h2 className="section-title" style={{ marginTop: 0, color: 'var(--danger-mid)' }}>
+            Zona de risco
+          </h2>
+          <p className="small-text" style={{ marginBottom: 12 }}>
+            Apaga colaboradores, gestores, registros de ponto, folgas e importações. Perfis de acesso e ciclos
+            configurados são preservados. Esta ação não pode ser desfeita.
+          </p>
+          <Button variant="danger" onClick={onResetClick}>
+            Resetar base
+          </Button>
+        </div>
+      )}
     </>
   );
 }
