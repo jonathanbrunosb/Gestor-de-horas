@@ -4,7 +4,7 @@ export type MetricTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
 
 interface MetricCardProps {
   title: string;
-  value: string;
+  value: ReactNode;
   note?: string;
   icon?: ReactNode;
   tone?: MetricTone;

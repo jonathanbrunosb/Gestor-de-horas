@@ -77,6 +77,15 @@ const kpiIcon: ReactNode = (
   </svg>
 );
 
+const journeySimulatorIcon: ReactNode = (
+  <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+    <circle cx="6.5" cy="7.5" r="5.5" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M6.5 4v3.5l2.3 1.3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="11.5" r="2.5" fill="currentColor" />
+    <path d="M10.9 11.5l0.7 0.7 1.3-1.4" stroke="var(--surface)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 const peopleIcon: ReactNode = (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
     <circle cx="7.5" cy="5" r="3" stroke="currentColor" strokeWidth="1.5" />
@@ -114,7 +123,10 @@ const settingsIcon: ReactNode = (
  * Facilitador não entra em Gestão BH / Pagamento — módulo de exposição
  * financeira fora do escopo operacional desse perfil. KPIs - Classe A segue a
  * mesma restrição: é acompanhamento gerencial nominal (ocorrências de
- * jornada por colaborador), não operacional.
+ * jornada por colaborador), não operacional. Simulador de Jornada segue
+ * canViewJourneySimulator (lib/permissions.ts): Desenvolvedor, Administrador,
+ * Gerente e Facilitador — não inclui Executivo (não é acompanhamento de
+ * time) nem Colaborador (autoatendimento não navega pelo menu).
  */
 export const MENU_GROUPS: MenuGroup[] = [
   {
@@ -142,6 +154,13 @@ export const MENU_GROUPS: MenuGroup[] = [
         route: '/kpis-classe-a',
         icon: kpiIcon,
         allowedRoles: ['Desenvolvedor', 'Administrador', 'Gerente', 'Executivo']
+      },
+      {
+        id: 'journeySimulator',
+        label: 'Simulador de Jornada',
+        route: '/simulador-jornada',
+        icon: journeySimulatorIcon,
+        allowedRoles: ['Desenvolvedor', 'Administrador', 'Gerente', 'Facilitador']
       }
     ]
   },

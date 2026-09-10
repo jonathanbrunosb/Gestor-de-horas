@@ -33,7 +33,10 @@ const ACTIONS: AuditAction[] = [
   'export.json',
   'export.csv',
   'system.reset_database',
-  'system.error'
+  'system.error',
+  'journey_simulator.calculate',
+  'journey_simulator.validate_entry',
+  'journey_simulator.copy_result'
 ];
 
 const ENTITY_TYPES: AuditEntityType[] = [
@@ -47,7 +50,8 @@ const ENTITY_TYPES: AuditEntityType[] = [
   'database',
   'notification',
   'app_setting',
-  'system'
+  'system',
+  'journey_simulator'
 ];
 
 const STATUSES: Array<{ value: string; label: string }> = [

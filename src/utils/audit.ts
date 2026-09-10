@@ -53,7 +53,10 @@ const ACTION_LABELS: Partial<Record<AuditAction, string>> = {
   'export.json': 'Exportação JSON',
   'export.csv': 'Exportação CSV',
   'system.reset_database': 'Base reiniciada',
-  'system.error': 'Erro do sistema'
+  'system.error': 'Erro do sistema',
+  'journey_simulator.calculate': 'Simulador de Jornada — cálculo realizado',
+  'journey_simulator.validate_entry': 'Simulador de Jornada — entrada verificada',
+  'journey_simulator.copy_result': 'Simulador de Jornada — resultado copiado'
 };
 
 const ENTITY_TYPE_LABELS: Partial<Record<AuditEntityType, string>> = {
@@ -67,7 +70,8 @@ const ENTITY_TYPE_LABELS: Partial<Record<AuditEntityType, string>> = {
   database: 'Base de dados',
   notification: 'Notificação',
   app_setting: 'Configuração',
-  system: 'Sistema'
+  system: 'Sistema',
+  journey_simulator: 'Simulador de Jornada'
 };
 
 /**

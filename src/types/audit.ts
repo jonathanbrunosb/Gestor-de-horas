@@ -37,7 +37,10 @@ export type AuditAction =
   | 'export.json'
   | 'export.csv'
   | 'system.reset_database'
-  | 'system.error';
+  | 'system.error'
+  | 'journey_simulator.calculate'
+  | 'journey_simulator.validate_entry'
+  | 'journey_simulator.copy_result';
 
 export type AuditStatus = 'success' | 'warning' | 'error';
 
@@ -52,7 +55,8 @@ export type AuditEntityType =
   | 'database'
   | 'notification'
   | 'app_setting'
-  | 'system';
+  | 'system'
+  | 'journey_simulator';
 
 export type AuditLog = AuditLogRow;
 

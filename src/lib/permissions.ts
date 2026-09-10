@@ -109,6 +109,16 @@ export function canViewAuditLogs(accessType: AccessType | null | undefined): boo
   return accessType === 'Desenvolvedor' || accessType === 'Administrador';
 }
 
+/**
+ * Acessar o Simulador de Jornada (cálculo de horário mínimo de próxima
+ * entrada por interjornada). Não inclui Executivo nem Colaborador — a tela
+ * é uma ferramenta operacional de apoio, não um dado de acompanhamento de
+ * time nem de autoatendimento.
+ */
+export function canViewJourneySimulator(accessType: AccessType | null | undefined): boolean {
+  return accessType === 'Desenvolvedor' || accessType === 'Administrador' || accessType === 'Gerente' || accessType === 'Facilitador';
+}
+
 export function canViewFinancials(accessType: AccessType | null | undefined): boolean {
   return isAuthorizedAccessType(accessType) && !isSelfServiceOnly(accessType);
 }

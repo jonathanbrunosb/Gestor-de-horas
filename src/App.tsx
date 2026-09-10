@@ -10,6 +10,7 @@ import { CalendarPage } from './pages/CalendarPage';
 import { UploadPage } from './pages/UploadPage';
 import { ManagementPage } from './pages/ManagementPage';
 import { KpiClasseAPage } from './pages/KpiClasseAPage';
+import { JourneySimulatorPage } from './pages/JourneySimulatorPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PeoplePage } from './pages/PeoplePage';
 import { AccessDeniedPage } from './pages/AccessDeniedPage';
@@ -67,6 +68,7 @@ function AppShell() {
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/gestao-bh" element={<ManagementPage />} />
             <Route path="/kpis-classe-a" element={<KpiClasseAPage />} />
+            <Route path="/simulador-jornada" element={<JourneySimulatorPage />} />
             <Route path="/configuracoes" element={<SettingsPage />} />
             <Route path="/colaboradores" element={<PeoplePage />} />
             <Route path="/acesso-negado" element={<AccessDeniedPage />} />

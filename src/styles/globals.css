@@ -450,6 +450,19 @@ textarea:disabled {
   grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr);
 }
 
+/* Simulador de Jornada: "Dados da última jornada" + "Regra aplicada" lado a
+   lado no desktop, mesma proporção de calendar-split — card da regra é só
+   texto explicativo, não precisa da mesma largura do formulário. */
+.grid.journey-split {
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+}
+
+/* Simulador de Jornada: os dois boxes de "Testar próxima entrada"
+   (resultado da verificação + exemplo de horário regular) lado a lado. */
+.grid.journey-test-split {
+  grid-template-columns: minmax(0, 1.3fr) minmax(240px, 1fr);
+}
+
 .list {
   display: grid;
   gap: 8px;
@@ -515,6 +528,58 @@ textarea:disabled {
   color: #7c2d2d;
   line-height: 1.45;
   margin: 0;
+}
+
+/* Variações de tom — mesmo box (ícone + título + texto) usado por padrão
+   para alertas de risco (vermelho, tom implícito); .success/.warning/.info
+   reaproveitam a mesma estrutura para os demais estados (ex.: Simulador de
+   Jornada: Regular/Atenção, e o callout informativo do card "Regra
+   aplicada"). Nenhum uso existente do .alert-box passa uma dessas classes,
+   então o tom padrão (vermelho) permanece idêntico para quem já o usa.
+*/
+.alert-box.success {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+.alert-box.success .alert-box-icon {
+  color: var(--success);
+  background: var(--success-border);
+}
+.alert-box.success h3 {
+  color: var(--success);
+}
+.alert-box.success p {
+  color: var(--success);
+}
+
+.alert-box.warning {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+.alert-box.warning .alert-box-icon {
+  color: var(--warning);
+  background: var(--warning-border);
+}
+.alert-box.warning h3 {
+  color: var(--warning);
+}
+.alert-box.warning p {
+  color: var(--warning);
+}
+
+.alert-box.info {
+  border-color: var(--info-border);
+  background: var(--info-bg);
+}
+.alert-box.info .alert-box-icon {
+  color: var(--info);
+  background: var(--info-border);
+}
+.alert-box.info h3 {
+  color: var(--info);
+}
+.alert-box.info p {
+  color: var(--info);
 }
 
 .kpi-row {
@@ -591,7 +656,9 @@ textarea:disabled {
   }
   .grid.two-col,
   .grid.calendar-split,
-  .grid.charts-split {
+  .grid.charts-split,
+  .grid.journey-split,
+  .grid.journey-test-split {
     grid-template-columns: 1fr;
   }
   .filters,
